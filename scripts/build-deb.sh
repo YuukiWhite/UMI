@@ -16,10 +16,22 @@ rm -rf "$STAGE"
 mkdir -p \
   "$STAGE/DEBIAN" \
   "$STAGE/usr/bin" \
+  "$STAGE/usr/lib/umi" \
   "$STAGE/usr/share/applications" \
   "$STAGE/usr/share/icons/hicolor/scalable/apps"
 
-install -m 0755 "$BIN_SRC" "$STAGE/usr/bin/umi"
+install -m 0755 "$BIN_SRC" "$STAGE/usr/lib/umi/umi"
+LAYER_SHELL_SO="$(ldd "$BIN_SRC" | awk '/libgtk4-layer-shell\.so/ {print $3; exit}')"
+if [[ -n "${LAYER_SHELL_SO:-}" && -f "$LAYER_SHELL_SO" ]]; then
+  cp -L "$LAYER_SHELL_SO" "$STAGE/usr/lib/umi/libgtk4-layer-shell.so.0"
+  chmod 0755 "$STAGE/usr/lib/umi/libgtk4-layer-shell.so.0"
+fi
+cat > "$STAGE/usr/bin/umi" <<'EOF'
+#!/usr/bin/env bash
+export LD_LIBRARY_PATH="/usr/lib/umi${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec /usr/lib/umi/umi "$@"
+EOF
+chmod 0755 "$STAGE/usr/bin/umi"
 install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.svg" "$STAGE/usr/share/icons/hicolor/scalable/apps/org.umi.Notch.svg"
 
 cat > "$STAGE/usr/share/applications/org.umi.Notch.desktop" <<'EOF'
@@ -43,7 +55,7 @@ Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: YuukiWhite <YuukiWhite@users.noreply.github.com>
-Depends: libgtk-4-1, libgtk4-layer-shell0, libsqlite3-0, libdbus-1-3
+Depends: libgtk-4-1, libsqlite3-0, libdbus-1-3
 Homepage: https://github.com/YuukiWhite/UMI
 Description: UMI — Ambient Dynamic Island Companion for Linux Wayland
  Pure Rust GTK4 layer-shell Dynamic Island overlay with 18 interactive states,

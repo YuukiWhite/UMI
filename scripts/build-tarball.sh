@@ -14,8 +14,13 @@ if [[ ! -x "$BIN_SRC" ]]; then
 fi
 
 rm -rf "$STAGE"
-mkdir -p "$STAGE/bin" "$STAGE/assets/icons"
-install -m 0755 "$BIN_SRC" "$STAGE/bin/umi"
+mkdir -p "$STAGE/bin" "$STAGE/lib" "$STAGE/assets/icons"
+install -m 0755 "$BIN_SRC" "$STAGE/bin/umi-bin"
+LAYER_SHELL_SO="$(ldd "$BIN_SRC" | awk '/libgtk4-layer-shell\.so/ {print $3; exit}')"
+if [[ -n "${LAYER_SHELL_SO:-}" && -f "$LAYER_SHELL_SO" ]]; then
+  cp -L "$LAYER_SHELL_SO" "$STAGE/lib/libgtk4-layer-shell.so.0"
+  chmod 0755 "$STAGE/lib/libgtk4-layer-shell.so.0"
+fi
 install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.svg" "$STAGE/assets/icons/umi-logo.svg"
 install -m 0644 "$ROOT_DIR/README.md" "$STAGE/README.md"
 
@@ -26,12 +31,22 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="${HOME}/.local/bin"
+LIB_DIR="${HOME}/.local/lib/umi"
 APP_DIR="${HOME}/.local/share/applications"
 ICON_DIR="${HOME}/.local/share/icons/hicolor/scalable/apps"
 QUOTA_DIR="${HOME}/.config/umi/quota-scripts"
 
-mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR" "$QUOTA_DIR"
-install -m 0755 "$DIR/bin/umi" "$BIN_DIR/umi"
+mkdir -p "$BIN_DIR" "$LIB_DIR" "$APP_DIR" "$ICON_DIR" "$QUOTA_DIR"
+install -m 0755 "$DIR/bin/umi-bin" "$LIB_DIR/umi"
+if [[ -f "$DIR/lib/libgtk4-layer-shell.so.0" ]]; then
+  install -m 0755 "$DIR/lib/libgtk4-layer-shell.so.0" "$LIB_DIR/libgtk4-layer-shell.so.0"
+fi
+cat > "$BIN_DIR/umi" <<WRAP
+#!/usr/bin/env bash
+export LD_LIBRARY_PATH="${LIB_DIR}\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
+exec "${LIB_DIR}/umi" "\$@"
+WRAP
+chmod 0755 "$BIN_DIR/umi"
 install -m 0644 "$DIR/assets/icons/umi-logo.svg" "$ICON_DIR/org.umi.Notch.svg"
 
 cat > "$APP_DIR/org.umi.Notch.desktop" <<DESKTOP
