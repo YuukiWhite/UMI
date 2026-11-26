@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="220" height="220">
+  <defs>
+    <linearGradient id="tileBg" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#F6F9FF"/>
+      <stop offset="100%" stop-color="#DCE6FF"/>
+    </linearGradient>
+    <linearGradient id="rimGrad" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="220" height="220" rx="55" fill="url(#tileBg)"/>
+  <g transform="translate(26, 58)">
+    <path d="M 6.72 0 L 161.28 0 C 165.48 0 168 2.53 168 5.91 C 168 9.28 164.64 11.81 159.6 11.81 C 149.52 11.81 146.16 18.56 146.16 30.38 L 146.16 59.06 C 146.16 91.13 124.32 108 84 108 C 43.68 108 21.84 91.13 21.84 59.06 L 21.84 30.38 C 21.84 18.56 18.48 11.81 8.4 11.81 C 3.36 11.81 0 9.28 0 5.91 C 0 2.53 2.52 0 6.72 0 Z"
+          fill="#05070E" stroke="url(#rimGrad)" stroke-width="2.8"/>
+  </g>
+  <rect x="76" y="95" width="20" height="25" rx="7.5" fill="#FFFFFF"/>
+  <circle cx="83.25" cy="102.25" r="2.75" fill="#7DD3FC"/>
+  <rect x="124" y="95" width="20" height="25" rx="7.5" fill="#FFFFFF"/>
+  <circle cx="131.25" cy="102.25" r="2.75" fill="#7DD3FC"/>
+  <path d="M 99 128 C 106.33 137.33 113.67 137.33 121 128" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

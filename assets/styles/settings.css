@@ -1,0 +1,335 @@
+window.umi-settings-window {
+    background-color: #070912;
+    color: #ECEFF7;
+    font-family: "Inter", "Noto Sans", sans-serif;
+}
+
+headerbar.umi-settings-header {
+    background-color: #090C16;
+    background-image: none;
+    border-bottom: 1px solid rgba(236, 239, 247, 0.10);
+    min-height: 44px;
+    padding: 0 12px;
+    box-shadow: none;
+}
+
+headerbar.umi-settings-header .umi-win-title {
+    color: #8C94A8;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.umi-sidebar {
+    background-color: #0A0D18;
+    border-right: 1px solid rgba(236, 239, 247, 0.10);
+    padding: 14px 12px;
+}
+
+.umi-brand-name {
+    color: #ECEFF7;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+}
+
+.umi-ver-pill {
+    background-color: rgba(56, 189, 248, 0.14);
+    color: #7DD3FC;
+    border-radius: 999px;
+    padding: 2px 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+button.umi-nav-btn {
+    background-color: transparent;
+    background-image: none;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 7px 9px;
+    color: #B4BCCF;
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: none;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+button.umi-nav-btn:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ECEFF7;
+}
+
+button.umi-nav-btn.active {
+    background-color: rgba(56, 189, 248, 0.12);
+    border-color: rgba(56, 189, 248, 0.25);
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+.umi-badge {
+    min-width: 22px;
+    min-height: 22px;
+    border-radius: 6px;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.umi-badge-general { background-image: linear-gradient(135deg, #38BDF8, #2563EB); }
+.umi-badge-appearance { background-image: linear-gradient(135deg, #EC4899, #8B5CF6); }
+.umi-badge-pages { background-image: linear-gradient(135deg, #818CF8, #4F46E5); }
+.umi-badge-focus { background-image: linear-gradient(135deg, #2DD4BF, #0EA5E9); }
+.umi-badge-prayer { background-image: linear-gradient(135deg, #FBBF24, #EA580C); }
+.umi-badge-ai { background-image: linear-gradient(135deg, #A855F7, #38BDF8); }
+.umi-badge-about { background-image: linear-gradient(135deg, #34D399, #059669); }
+
+.umi-privacy-footer {
+    color: #6B7280;
+    font-size: 10.5px;
+}
+
+.umi-content-wrap {
+    padding: 20px 24px 24px 24px;
+}
+
+.umi-page-title {
+    color: #ECEFF7;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.umi-page-sub {
+    color: #8C94A8;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.umi-sec-label {
+    color: #7C859C;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.umi-card {
+    background-color: #0D1120;
+    border: 1px solid rgba(236, 239, 247, 0.09);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.umi-row-title {
+    color: #ECEFF7;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.umi-row-sub {
+    color: #8C94A8;
+    font-size: 11px;
+}
+
+.umi-preview-box {
+    background-image: linear-gradient(180deg, #162240 0%, #0D1429 100%);
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 12px;
+    padding: 10px 14px 12px 14px;
+}
+
+button.umi-seg-btn {
+    background-color: rgba(255, 255, 255, 0.06);
+    background-image: none;
+    border: 1px solid rgba(236, 239, 247, 0.10);
+    border-radius: 8px;
+    padding: 5px 11px;
+    color: #B4BCCF;
+    font-size: 11.5px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+button.umi-seg-btn:hover {
+    background-color: rgba(255, 255, 255, 0.11);
+    color: #FFFFFF;
+}
+
+button.umi-seg-btn.active {
+    background-image: linear-gradient(135deg, #38BDF8, #6366F1);
+    border-color: transparent;
+    color: #FFFFFF;
+}
+
+button.umi-action-btn {
+    background-color: rgba(56, 189, 248, 0.15);
+    background-image: none;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #7DD3FC;
+    font-size: 11.5px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+button.umi-action-btn:hover {
+    background-color: rgba(56, 189, 248, 0.25);
+    color: #FFFFFF;
+}
+
+button.umi-danger-btn {
+    background-color: rgba(239, 68, 68, 0.14);
+    background-image: none;
+    border: 1px solid rgba(239, 68, 68, 0.32);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #FCA5A5;
+    font-size: 11.5px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+button.umi-danger-btn:hover {
+    background-color: rgba(239, 68, 68, 0.28);
+    color: #FFFFFF;
+}
+
+button.umi-swatch-btn {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    box-shadow: none;
+    transition: border-color 220ms ease, box-shadow 220ms ease, transform 180ms ease;
+}
+
+button.umi-swatch-btn:hover {
+    transform: scale(1.1);
+}
+
+button.umi-swatch-btn.active {
+    border: 2.5px solid #FFFFFF;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.55);
+}
+
+.umi-swatch-sky { background-image: linear-gradient(135deg, #38BDF8, #6366F1, #A855F7); }
+.umi-swatch-rose { background-image: linear-gradient(135deg, #EC4899, #8B5CF6); }
+.umi-swatch-mint { background-image: linear-gradient(135deg, #10B981, #2DD4BF); }
+.umi-swatch-amber { background-image: linear-gradient(135deg, #F59E0B, #EF4444); }
+.umi-swatch-ocean { background-image: linear-gradient(135deg, #3B82F6, #06B6D4); }
+.umi-swatch-mono { background-image: linear-gradient(135deg, #E2E8F0, #64748B); }
+
+.umi-chip {
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(236, 239, 247, 0.10);
+    border-radius: 7px;
+    padding: 3px 8px;
+    color: #D2D8E6;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.umi-keycap {
+    background-color: #161C30;
+    border: 1px solid rgba(236, 239, 247, 0.18);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    padding: 2px 8px;
+    color: #ECEFF7;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: monospace;
+}
+
+.umi-prayer-slot {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(236, 239, 247, 0.08);
+    border-radius: 10px;
+    padding: 8px 6px;
+}
+
+.umi-prayer-slot.next {
+    background-color: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.45);
+}
+
+.umi-prayer-name {
+    color: #9CA3AF;
+    font-size: 10.5px;
+    font-weight: 600;
+}
+
+.umi-prayer-time {
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 700;
+    font-feature-settings: "tnum" 1;
+}
+
+.umi-verified-pill {
+    background-color: rgba(16, 185, 129, 0.16);
+    color: #34D399;
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.umi-warn-pill {
+    background-color: rgba(245, 158, 11, 0.16);
+    color: #FBBF24;
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+entry.umi-settings-entry,
+passwordentry.umi-settings-entry {
+    background-color: #090C16;
+    color: #FFFFFF;
+    caret-color: #38BDF8;
+    border: 1px solid rgba(236, 239, 247, 0.14);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+entry.umi-settings-entry:focus-within {
+    border-color: #38BDF8;
+}
+
+switch {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+}
+
+switch:checked {
+    background-color: #38BDF8;
+}
+
+scale trough {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    min-height: 5px;
+}
+
+scale highlight {
+    background-image: linear-gradient(90deg, #38BDF8, #6366F1);
+    border-radius: 999px;
+}
+
+scale slider {
+    background-color: #FFFFFF;
+    min-width: 14px;
+    min-height: 14px;
+    border-radius: 999px;
+}
+
+separator.umi-sep {
+    background-color: rgba(236, 239, 247, 0.08);
+    min-height: 1px;
+    margin: 4px 0;
+}
