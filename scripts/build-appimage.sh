@@ -18,12 +18,14 @@ mkdir -p \
   "$APPDIR/usr/bin" \
   "$APPDIR/usr/lib" \
   "$APPDIR/usr/share/applications" \
+  "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
   "$APPDIR/usr/share/icons/hicolor/scalable/apps" \
   "$APPDIR/usr/share/metainfo"
 
 install -m 0755 "$BIN_SRC" "$APPDIR/usr/bin/umi"
-install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.svg" "$APPDIR/org.umi.Notch.svg"
-install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.svg" "$APPDIR/.DirIcon"
+install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.png" "$APPDIR/org.umi.Notch.png"
+install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.png" "$APPDIR/.DirIcon"
+install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/org.umi.Notch.png"
 install -m 0644 "$ROOT_DIR/assets/icons/umi-logo.svg" "$APPDIR/usr/share/icons/hicolor/scalable/apps/org.umi.Notch.svg"
 
 # Bundle libgtk4-layer-shell so distros without it preinstalled still run UMI out of the box
@@ -55,8 +57,15 @@ cat > "$APPDIR/usr/share/metainfo/org.umi.Notch.appdata.xml" <<EOF
   <id>org.umi.Notch</id>
   <name>UMI</name>
   <summary>Ambient Dynamic Island Companion for Linux Wayland</summary>
+  <description>
+    <p>UMI is a Pure Rust GTK4 layer-shell Dynamic Island desktop overlay for Linux Wayland (KDE Plasma) with 18 interactive notch states, MPRIS2 synced lyrics, offline Prayer Times, Pomodoro, Hydration, File Shelf DnD, Ask UMI AI, live Codex quotas, and 7-screen Settings.</p>
+  </description>
+  <developer id="io.github.yuukiwhite">
+    <name>YuukiWhite</name>
+  </developer>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
+  <content_rating type="oars-1.1"/>
   <url type="homepage">https://github.com/YuukiWhite/UMI</url>
   <launchable type="desktop-id">org.umi.Notch.desktop</launchable>
   <releases>
