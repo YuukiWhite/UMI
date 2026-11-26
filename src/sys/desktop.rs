@@ -6,7 +6,16 @@ use std::path::PathBuf;
 
 const UMI_ICON_SVG: &str = include_str!("../../assets/icons/umi-logo.svg");
 
+fn is_running_in_appimage() -> bool {
+    std::env::var_os("APPIMAGE").is_some()
+}
+
 fn current_exec_path() -> String {
+    if let Ok(appimage) = std::env::var("APPIMAGE") {
+        if !appimage.trim().is_empty() {
+            return appimage;
+        }
+    }
     std::env::current_exe()
         .ok()
         .and_then(|p| p.to_str().map(str::to_string))
@@ -36,7 +45,11 @@ fn desktop_entry_contents(exec: &str, autostart: bool) -> String {
 
 /// Install `~/.local/share/applications/org.umi.Notch.desktop` and hicolor SVG icon
 /// so KDE Plasma portals (GlobalShortcuts, Screenshot) and Kickoff recognize UMI by name & icon.
+/// Skipped when running inside an AppImage so managers like Gear Lever own the launcher cleanly.
 pub fn install_desktop_entry() -> Result<()> {
+    if is_running_in_appimage() {
+        return Ok(());
+    }
     let exec = current_exec_path();
 
     if let Some(base) = BaseDirs::new() {

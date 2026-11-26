@@ -1,0 +1,148 @@
+name: Release Packages (AppImage, DEB, RPM, Tarball)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.3.1)"
+        required: true
+        default: "v1.3.1"
+
+permissions:
+  contents: write
+
+jobs:
+  build-appimage-deb-tar:
+    name: Build AppImage + zsync, DEB & Tarball (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install GTK4 & Layer-Shell build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libgtk4-layer-shell-dev \
+            libsqlite3-dev \
+            libdbus-1-dev \
+            pkg-config \
+            zsync \
+            file
+
+      - name: Setup Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run unit tests & build release binary
+        run: |
+          cargo test --locked
+          cargo build --release --locked
+
+      - name: Download appimagetool
+        run: |
+          curl -fL -o /tmp/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+
+      - name: Build AppImage (+ zsync for Gear Lever auto-update)
+        env:
+          APPIMAGETOOL: /tmp/appimagetool
+        run: ./scripts/build-appimage.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Build DEB package
+        run: ./scripts/build-deb.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Build portable tar.gz installer archive
+        run: ./scripts/build-tarball.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Upload Ubuntu artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-ubuntu
+          path: |
+            dist/*.AppImage
+            dist/*.AppImage.zsync
+            dist/*.deb
+            dist/*.tar.gz
+
+  build-rpm:
+    name: Build RPM (Fedora)
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:42
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Fedora RPM & Rust build dependencies
+        run: |
+          dnf install -y \
+            rust cargo \
+            gtk4-devel gtk4-layer-shell-devel \
+            sqlite-devel dbus-devel \
+            rpm-build tar gzip
+
+      - name: Build RPM package
+        run: ./scripts/build-rpm.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-rpm
+          path: dist/*.rpm
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-appimage-deb-tar, build-rpm]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all release packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS.txt
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create / Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/*

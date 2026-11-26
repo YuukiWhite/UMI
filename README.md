@@ -50,26 +50,42 @@ UMI uses the Wayland **`zwlr_layer_shell_v1`** protocol (`gtk4-layer-shell`) and
 
 ---
 
-## Build & Installation
+## Easy Installation
 
-### 1. Install Dependencies
+Download the latest packages directly from [**GitHub Releases**](https://github.com/YuukiWhite/UMI/releases/latest):
 
-**Fedora (40–44+):**
+### Option 1 — AppImage + Gear Lever (Recommended · Auto-Update)
+1. Download **`UMI-*-x86_64.AppImage`** from [GitHub Releases](https://github.com/YuukiWhite/UMI/releases/latest).
+2. Open it with **Gear Lever** (or drag it into Gear Lever) and click **Move to the app menu**.
+3. **Auto-Update:** Every UMI AppImage embeds official `gh-releases-zsync` update metadata (`UMI-*x86_64.AppImage.zsync`), so Gear Lever automatically detects and updates new releases in 1 click.
+
+### Option 2 — 1-Line Script / Portable `.tar.gz`
 ```bash
-sudo dnf install rust cargo gtk4-devel gtk4-layer-shell-devel sqlite-devel dbus-devel
+curl -fsSL https://raw.githubusercontent.com/YuukiWhite/UMI/main/scripts/quick-install.sh | bash
+```
+Or download `UMI-*-x86_64-linux.tar.gz` manually, extract, and run `./install.sh`:
+```bash
+tar -xzf UMI-*-x86_64-linux.tar.gz
+cd umi-*-x86_64-linux
+./install.sh
 ```
 
-**Arch Linux / CachyOS / EndeavourOS:**
+### Option 3 — Native Packages (`.rpm` / `.deb`)
+**Fedora / openSUSE (`.rpm`):**
 ```bash
-sudo pacman -S rust gtk4 gtk4-layer-shell sqlite dbus
+sudo dnf install ./umi-*.x86_64.rpm
+```
+**Ubuntu 24.04+ / Debian Testing (`.deb`):**
+```bash
+sudo apt install ./umi_*_amd64.deb
 ```
 
-**Ubuntu 24.04+ / Debian Testing:**
-```bash
-sudo apt install cargo rustc libgtk-4-dev libgtk4-layer-shell-dev libsqlite3-dev libdbus-1-dev pkg-config
-```
+### Option 4 — Build from Source
 
-### 2. Build & Install Locally
+**Install build dependencies:**
+- **Fedora (40–44+):** `sudo dnf install rust cargo gtk4-devel gtk4-layer-shell-devel sqlite-devel dbus-devel`
+- **Arch / CachyOS:** `sudo pacman -S rust gtk4 gtk4-layer-shell sqlite dbus`
+- **Ubuntu 24.04+ / Debian:** `sudo apt install cargo rustc libgtk-4-dev libgtk4-layer-shell-dev libsqlite3-dev libdbus-1-dev pkg-config`
 
 ```bash
 git clone https://github.com/YuukiWhite/UMI.git
@@ -78,12 +94,7 @@ cargo build --release
 ./scripts/install.sh
 ```
 
-This installs:
-- `~/.local/bin/umi`
-- `~/.local/share/applications/org.umi.Notch.desktop`
-- `~/.local/share/icons/hicolor/scalable/apps/org.umi.Notch.svg`
-
-Launch **UMI** from KDE Kickoff / KRunner or run `umi` from any terminal. To uninstall, run `./scripts/uninstall.sh` (pass `--purge` to also remove config & SQLite data).
+To uninstall a tarball/local install, run `./scripts/uninstall.sh` (pass `--purge` to also remove `~/.config/umi` and SQLite data).
 
 ---
 
