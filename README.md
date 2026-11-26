@@ -1,6 +1,13 @@
 # UMI — Ambient Notch Companion
 
-**UMI** is a lightweight, **Pure Rust** Dynamic Island desktop overlay built for **Linux Wayland** (`gtk4-rs` + `gtk4-layer-shell` + `tokio` + `zbus` + `rusqlite` + `ksni`). It lives cleanly at the top center edge of your screen with smooth VSync animations, concave bezel fillets, click-through Wayland input regions, 18 interactive notch states, and a 7-screen Desktop Settings app.
+**UMI** is a lightweight, **Pure Rust** Dynamic Island desktop overlay built for **Linux Wayland** (`gtk4-rs` + `gtk4-layer-shell` + `tokio` + `zbus` + `rusqlite` + `ksni`). It lives cleanly at the top center edge of your screen with smooth VSync animations, concave bezel fillets, click-through Wayland input regions, 18 interactive notch states, expressive procedural mascot animations, and a 7-screen Desktop Settings app.
+
+![UMI Dynamic Island Showcase](docs/assets/umi-showcase.png)
+
+### Expressive Procedural Mascot (`01 Resting`)
+Natural & double-blink, glance left/right-up, playful wink, joyful `^ ◡ ^` smile (also reacts when logging water or completing tasks), curious mini-yawn, and late-night sleepy mode (`23:00–05:00`) — rendered 100% in Cairo with zero extra dependencies or idle CPU overhead.
+
+![UMI Mascot Expressions](docs/assets/umi-mascot-expressions.png)
 
 ---
 

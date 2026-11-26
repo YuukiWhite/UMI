@@ -15,7 +15,9 @@ use crate::ui::notch::phase3::{
 use crate::ui::notch::phase4::{
     ai_answer_hit_zones, ai_limits_hit_zones, ai_prompt_hit_zones, Phase4Data,
 };
-use crate::ui::notch::renderer::{accent_aura_stops, draw_notch, LiveData, RenderFrame};
+use crate::ui::notch::renderer::{
+    accent_aura_stops, draw_notch, mascot_needs_redraw, LiveData, RenderFrame,
+};
 use crate::ui::settings::build_settings_window;
 use crate::ui::tray::TrayFlags;
 use chrono::{Local, Timelike};
@@ -63,6 +65,7 @@ struct NotchRuntime {
     float_mix: f64,
     ear_mix: f64,
     glass_mix: f64,
+    mascot_happy_boost: f64,
     pending_expand: Option<glib::SourceId>,
     pending_collapse: Option<glib::SourceId>,
     pending_peek_dismiss: Option<glib::SourceId>,
@@ -341,6 +344,7 @@ pub fn build_notch_window(
         float_mix: init_float_mix,
         ear_mix: init_ear_mix,
         glass_mix: init_glass_mix,
+        mascot_happy_boost: 0.0,
         pending_expand: None,
         pending_collapse: None,
         pending_peek_dismiss: None,
@@ -463,6 +467,7 @@ pub fn build_notch_window(
             frame.ear_mix = state.ear_mix;
             frame.glass_mix = state.glass_mix;
             frame.has_style_anim = true;
+            frame.mascot_happy_boost = state.mascot_happy_boost;
             let ai_vis = ai_weak
                 .upgrade()
                 .map(|e| WidgetExt::is_visible(&e))
@@ -682,8 +687,16 @@ pub fn build_notch_window(
                 }
             }
 
+            if st.mascot_happy_boost > 0.0 {
+                // Only decay reactive joy once the user sees the Resting mascot again
+                if st.sm.current == NotchState::Resting {
+                    st.mascot_happy_boost = (st.mascot_happy_boost - dt * 0.45).max(0.0);
+                }
+            }
+
             let elapsed = st.start_instant.elapsed().as_secs_f64();
-            let in_blink = (elapsed % 4.4) > 4.20;
+            let mascot_anim = st.sm.current == NotchState::Resting
+                && mascot_needs_redraw(elapsed, st.mascot_happy_boost);
             let needs_live_redraw = lyrics_moving
                 || dots_moving
                 || color_moving
@@ -695,7 +708,7 @@ pub fn build_notch_window(
                         || st.sm.current.is_expanded_or_wide()))
                 || st.sm.current.is_expanded_or_wide();
 
-            if spring_moving || was_active || in_blink || needs_live_redraw {
+            if spring_moving || was_active || mascot_anim || needs_live_redraw {
                 area.queue_draw();
             }
 
@@ -1043,6 +1056,7 @@ pub fn build_notch_window(
                         } else {
                             st.water.today_ml += bottle;
                         }
+                        st.mascot_happy_boost = 1.0;
                         handled = true;
                     } else if wz.settings_btn.contains(cx, cy) {
                         st.sm.current = NotchState::InNotchSettings;
@@ -1185,6 +1199,9 @@ pub fn build_notch_window(
                                             st.tasks = list;
                                             let max_s = st.tasks.len().saturating_sub(3);
                                             st.todo_scroll = st.todo_scroll.min(max_s);
+                                            if !st.todo_edit_mode {
+                                                st.mascot_happy_boost = 1.0;
+                                            }
                                         }
                                     }
                                 }
