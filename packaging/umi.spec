@@ -1,3 +1,5 @@
+%global debug_package %{nil}
+
 Name:           umi
 Version:        1.3.1
 Release:        1%{?dist}
@@ -35,6 +37,7 @@ cargo build --release --locked
 %install
 install -Dm0755 target/release/umi %{buildroot}%{_bindir}/umi
 install -Dm0644 assets/icons/umi-logo.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/org.umi.Notch.svg
+mkdir -p %{buildroot}%{_datadir}/applications
 cat > %{buildroot}%{_datadir}/applications/org.umi.Notch.desktop << 'EOF'
 [Desktop Entry]
 Type=Application
@@ -44,7 +47,7 @@ Comment=Dynamic Island desktop overlay for KDE Plasma Wayland
 Exec=/usr/bin/umi
 Icon=org.umi.Notch
 Terminal=false
-Categories=Utility;DesktopUtility;
+Categories=Utility;
 StartupNotify=false
 StartupWMClass=org.umi.Notch
 EOF

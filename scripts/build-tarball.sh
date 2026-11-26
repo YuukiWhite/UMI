@@ -58,7 +58,7 @@ Comment=Dynamic Island desktop overlay for Linux Wayland (KDE Plasma)
 Exec=${BIN_DIR}/umi
 Icon=org.umi.Notch
 Terminal=false
-Categories=Utility;DesktopUtility;
+Categories=Utility;
 StartupNotify=false
 StartupWMClass=org.umi.Notch
 DESKTOP

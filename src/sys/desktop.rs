@@ -32,7 +32,7 @@ fn desktop_entry_contents(exec: &str, autostart: bool) -> String {
          Exec={exec}\n\
          Icon=org.umi.Notch\n\
          Terminal=false\n\
-         Categories=Utility;DesktopUtility;\n\
+         Categories=Utility;\n\
          StartupNotify=false\n\
          StartupWMClass=org.umi.Notch\n"
     );
