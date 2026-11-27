@@ -20,6 +20,8 @@ pub struct TaskItem {
     pub id: i64,
     pub title: String,
     pub completed: bool,
+    /// Optional YYYY-MM-DD scheduled date for Calendar To-Do.
+    pub due_date: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -98,8 +100,15 @@ impl LocalDb {
                 accent_hex    TEXT NOT NULL,
                 updated_at    INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS quick_notes (
+                id         INTEGER PRIMARY KEY CHECK (id = 1),
+                content    TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
             ",
         )?;
+        // Safe migration for existing v1.3 databases without `due_date`.
+        let _ = conn.execute("ALTER TABLE tasks ADD COLUMN due_date TEXT", []);
         Ok(())
     }
 
@@ -196,29 +205,51 @@ impl LocalDb {
     pub fn list_tasks(&self) -> Result<Vec<TaskItem>> {
         let guard = self.conn.lock().expect("db mutex poisoned");
         let mut stmt = guard.prepare(
-            "SELECT id, title, completed FROM tasks ORDER BY completed ASC, id DESC LIMIT 30",
+            "SELECT id, title, completed, due_date FROM tasks ORDER BY completed ASC, id DESC LIMIT 120",
         )?;
         let rows = stmt.query_map([], |r| {
             Ok(TaskItem {
                 id: r.get(0)?,
                 title: r.get(1)?,
                 completed: r.get::<_, i64>(2)? != 0,
+                due_date: r.get(3)?,
             })
         })?;
         Ok(rows.flatten().collect())
     }
 
-    pub fn add_task(&self, title: &str) -> Result<Vec<TaskItem>> {
+    pub fn add_task_for_date(&self, title: &str, due_date: Option<&str>) -> Result<Vec<TaskItem>> {
         let clean = title.trim();
         if !clean.is_empty() {
             let now = chrono::Utc::now().timestamp();
             let guard = self.conn.lock().expect("db mutex poisoned");
             guard.execute(
-                "INSERT INTO tasks (title, completed, source, created_at) VALUES (?1, 0, 'local', ?2)",
-                params![clean, now],
+                "INSERT INTO tasks (title, completed, due_date, source, created_at) VALUES (?1, 0, ?2, 'local', ?3)",
+                params![clean, due_date, now],
             )?;
         }
         self.list_tasks()
+    }
+
+    // --- Quick Notes ---
+
+    pub fn get_quick_note(&self) -> Result<String> {
+        let guard = self.conn.lock().expect("db mutex poisoned");
+        let row: Option<String> = guard
+            .query_row("SELECT content FROM quick_notes WHERE id = 1", [], |r| r.get(0))
+            .optional()?;
+        Ok(row.unwrap_or_else(|| "Klik untuk menulis catatan cepat...".to_string()))
+    }
+
+    pub fn set_quick_note(&self, content: &str) -> Result<()> {
+        let now = chrono::Utc::now().timestamp();
+        let guard = self.conn.lock().expect("db mutex poisoned");
+        guard.execute(
+            "INSERT INTO quick_notes (id, content, updated_at) VALUES (1, ?1, ?2)
+             ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at",
+            params![content.trim(), now],
+        )?;
+        Ok(())
     }
 
     pub fn toggle_task(&self, id: i64) -> Result<Vec<TaskItem>> {

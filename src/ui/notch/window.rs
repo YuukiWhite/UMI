@@ -1,5 +1,5 @@
 use crate::ai::{AiRequest, AiResponse};
-use crate::config::{self, AiConfig, NotchPageId, UmiConfig};
+use crate::config::{self, AiConfig, NotchPageId, UmiConfig, WidgetKind};
 use crate::domain::pomodoro::PomodoroEngine;
 use crate::domain::prayer_calc::{compute_today_schedule, PrayerSchedule};
 use crate::lyrics::active_line_index;
@@ -8,9 +8,10 @@ use crate::state::machine::{NotchState, StateMachine};
 use crate::state::spring::NotchSpring;
 use crate::state::{AppEvent, ClipboardEntry, LyricsData, MediaCommand, MediaSnapshot};
 use crate::storage::{LocalDb, ShelfItem, TaskItem, WaterSummary};
+use crate::sys::telemetry::{fetch_open_meteo, WidgetTelemetry};
 use crate::ui::notch::phase3::{
-    focus_hit_zones, shelf_hit_zones, todo_hit_zones, water_hit_zones, water_settings_hit_zones,
-    Phase3Data,
+    focus_hit_zones, shelf_hit_zones, tasks_for_date, todo_hit_zones, water_hit_zones,
+    water_settings_hit_zones, widgets_hit_zones, Phase3Data,
 };
 use crate::ui::notch::phase4::{
     ai_answer_hit_zones, ai_limits_hit_zones, ai_prompt_hit_zones, Phase4Data,
@@ -20,7 +21,7 @@ use crate::ui::notch::renderer::{
 };
 use crate::ui::settings::build_settings_window;
 use crate::ui::tray::TrayFlags;
-use chrono::{Local, Timelike};
+use chrono::{Duration as ChronoDuration, Local, NaiveDate, Timelike};
 use gtk4::cairo::{Format, ImageSurface, RectangleInt, Region};
 use gtk4::gdk;
 use gtk4::gio;
@@ -97,7 +98,10 @@ struct NotchRuntime {
     tasks: Vec<TaskItem>,
     todo_edit_mode: bool,
     todo_scroll: usize,
+    todo_selected_date: NaiveDate,
     todo_entry_open: bool,
+    telemetry: WidgetTelemetry,
+    last_telemetry_tick: Instant,
     // Phase 4 Ask UMI AI, Smart OCR & AI Limits state
     ai_req_tx: async_channel::Sender<AiRequest>,
     quota_refresh_tx: async_channel::Sender<()>,
@@ -281,14 +285,15 @@ pub fn build_notch_window(
     drawing.set_vexpand(true);
     overlay.set_child(Some(&drawing));
 
-    // Inline GTK4 Entry for "+ Add Task" inside Notch 13 To-do
+    // Inline GTK4 Entry for "+ Add" inside Notch 13 Calendar & To-do
     let todo_entry = Entry::builder()
-        .placeholder_text("New task title · Enter to save, Esc to cancel")
+        .placeholder_text("What to do · Enter simpan, Esc batal")
         .visible(false)
         .halign(Align::Center)
         .valign(Align::Start)
-        .width_request((230.0 * scale) as i32)
-        .margin_top((86.0 * scale) as i32)
+        .width_request((244.0 * unit) as i32)
+        .margin_top((66.0 * unit) as i32)
+        .margin_start((174.0 * unit) as i32)
         .build();
     todo_entry.add_css_class("umi-inline-entry");
     overlay.add_overlay(&todo_entry);
@@ -323,6 +328,14 @@ pub fn build_notch_window(
         0.0
     };
     let init_glass_mix = if cfg.appearance.style == config::NotchStyle::Glass { 1.0 } else { 0.0 };
+
+    let mut init_telemetry = WidgetTelemetry::default();
+    if let Some(ref d) = db {
+        if let Ok(note) = d.get_quick_note() {
+            init_telemetry.quick_note = note;
+        }
+    }
+    init_telemetry.refresh_for_slots(cfg.widgets.left, cfg.widgets.right);
 
     let rt = Rc::new(RefCell::new(NotchRuntime {
         config: cfg,
@@ -374,7 +387,10 @@ pub fn build_notch_window(
         tasks: tasks_init,
         todo_edit_mode: false,
         todo_scroll: 0,
+        todo_selected_date: Local::now().date_naive(),
         todo_entry_open: false,
+        telemetry: init_telemetry,
+        last_telemetry_tick: Instant::now(),
         ai_req_tx,
         quota_refresh_tx,
         ai_translate_mode: false,
@@ -387,7 +403,7 @@ pub fn build_notch_window(
     }));
     rt.borrow_mut().sync_targets(&window, &ai_entry);
 
-    // Inline To-do entry Enter handler
+    // Inline To-do entry Enter handler (saves with due_date = YYYY-MM-DD for selected calendar date)
     {
         let rt = Rc::clone(&rt);
         let win_weak = window.downgrade();
@@ -399,8 +415,14 @@ pub fn build_notch_window(
             let mut st = rt.borrow_mut();
             st.todo_entry_open = false;
             st.sm.interactive_lock = false;
+            let due_ymd = st.todo_selected_date.format("%Y-%m-%d").to_string();
+            let due_opt = if st.config.widgets.show_todo_calendar {
+                Some(due_ymd.as_str())
+            } else {
+                None
+            };
             if let Some(ref db) = st.db {
-                if let Ok(list) = db.add_task(&text) {
+                if let Ok(list) = db.add_task_for_date(&text, due_opt) {
                     st.tasks = list;
                     st.todo_scroll = 0;
                 }
@@ -489,8 +511,12 @@ pub fn build_notch_window(
                     tasks: &state.tasks,
                     todo_edit_mode: state.todo_edit_mode,
                     todo_scroll: state.todo_scroll,
+                    todo_selected_date: state.todo_selected_date,
+                    todo_entry_open: state.todo_entry_open,
                     battery_pct: state.battery_pct,
                     battery_charging: state.battery_charging,
+                    widgets_cfg: &state.config.widgets,
+                    telemetry: &state.telemetry,
                 },
                 phase4: Phase4Data {
                     translate_mode: state.ai_translate_mode,
@@ -505,11 +531,13 @@ pub fn build_notch_window(
         });
     }
 
-    // VSync-locked animation tick + Pomodoro + Prayer + Subpixel Lyrics Glide
+    // VSync-locked animation tick + Pomodoro + Prayer + Subpixel Lyrics Glide + Zero-Overhead Widgets Telemetry
     {
         let rt = Rc::clone(&rt);
         let win_weak = window.downgrade();
         let ai_weak = ai_entry.downgrade();
+        let rt_handle_tick = rt_handle.clone();
+        let event_tx_tick = event_tx.clone();
         drawing.add_tick_callback(move |area, clock| {
             let mut st = rt.borrow_mut();
             let now_us = clock.frame_time();
@@ -562,6 +590,27 @@ pub fn build_notch_window(
                     if let (Some(w), Some(ae)) = (win_weak.upgrade(), ai_weak.upgrade()) {
                         st.sync_targets(&w, &ae);
                     }
+                }
+            }
+
+            if st.sm.current == NotchState::Widgets {
+                let refresh_s = st.config.widgets.refresh_secs.max(1) as u64;
+                if st.last_telemetry_tick.elapsed().as_secs() >= refresh_s {
+                    st.last_telemetry_tick = Instant::now();
+                    let (wl, wr) = (st.config.widgets.left, st.config.widgets.right);
+                    st.telemetry.refresh_for_slots(wl, wr);
+                    if st.telemetry.should_fetch_weather(wl, wr) {
+                        let city = st.config.prayer.city.clone();
+                        let lat = st.config.prayer.latitude;
+                        let lon = st.config.prayer.longitude;
+                        let tx_w = event_tx_tick.clone();
+                        rt_handle_tick.spawn(async move {
+                            if let Some(snap) = fetch_open_meteo(city, lat, lon).await {
+                                let _ = tx_w.send(AppEvent::WeatherUpdated(snap)).await;
+                            }
+                        });
+                    }
+                    area.queue_draw();
                 }
             }
 
@@ -1171,44 +1220,119 @@ pub fn build_notch_window(
                     }
                 }
 
-                // 5. To-do
+                // 5. Interactive Calendar + Date-Specific To-do
                 if !handled && st.sm.current == NotchState::Todo {
-                    let tz = todo_hit_zones(x, top_y, unit);
-                    if tz.add_btn.contains(cx, cy) {
+                    let cal_on = st.config.widgets.show_todo_calendar;
+                    let mon_start = st.config.widgets.week_starts_monday;
+                    let sel_date = st.todo_selected_date;
+                    let tz = todo_hit_zones(x, top_y, unit, sel_date, mon_start, cal_on);
+                    let open_inline_entry = |st: &mut NotchRuntime| {
                         st.todo_entry_open = true;
                         st.sm.interactive_lock = true;
                         if let Some(entry) = entry_weak.upgrade() {
+                            if st.config.widgets.show_todo_calendar {
+                                entry.set_placeholder_text(Some(&format!(
+                                    "What to do on {} · Enter simpan",
+                                    st.todo_selected_date.format("%d %b")
+                                )));
+                                entry.set_margin_start((174.0 * unit) as i32);
+                                entry.set_margin_top((66.0 * unit) as i32);
+                                entry.set_width_request((244.0 * unit) as i32);
+                            } else {
+                                entry.set_placeholder_text(Some("New task title · Enter to save, Esc to cancel"));
+                                entry.set_margin_start(0);
+                                entry.set_margin_top((86.0 * scale) as i32);
+                                entry.set_width_request((230.0 * scale) as i32);
+                            }
                             entry.set_visible(true);
                             entry.grab_focus();
                         }
+                    };
+
+                    if cal_on && tz.prev_month_btn.contains(cx, cy) {
+                        st.todo_selected_date -= ChronoDuration::days(21);
+                        st.todo_scroll = 0;
+                        handled = true;
+                    } else if cal_on && tz.next_month_btn.contains(cx, cy) {
+                        st.todo_selected_date += ChronoDuration::days(21);
+                        st.todo_scroll = 0;
+                        handled = true;
+                    } else if cal_on && tz.today_btn.contains(cx, cy) {
+                        st.todo_selected_date = Local::now().date_naive();
+                        st.todo_scroll = 0;
+                        handled = true;
+                    } else if tz.add_btn.contains(cx, cy) {
+                        open_inline_entry(&mut st);
                         handled = true;
                     } else if tz.edit_btn.contains(cx, cy) {
                         st.todo_edit_mode = !st.todo_edit_mode;
                         handled = true;
                     } else {
-                        for (slot, rect) in tz.rows.iter().enumerate() {
-                            if rect.contains(cx, cy) {
-                                if let Some(task_id) = st.tasks.get(st.todo_scroll + slot).map(|t| t.id) {
-                                    if let Some(ref db) = st.db {
-                                        let res = if st.todo_edit_mode {
-                                            db.delete_task(task_id)
-                                        } else {
-                                            db.toggle_task(task_id)
-                                        };
-                                        if let Ok(list) = res {
-                                            st.tasks = list;
-                                            let max_s = st.tasks.len().saturating_sub(3);
-                                            st.todo_scroll = st.todo_scroll.min(max_s);
-                                            if !st.todo_edit_mode {
-                                                st.mascot_happy_boost = 1.0;
+                        // Check clickable calendar date cells
+                        if cal_on {
+                            for (day, rect) in &tz.day_cells {
+                                if rect.contains(cx, cy) {
+                                    if *day == st.todo_selected_date {
+                                        // Second click on selected date opens quick What-to-Do entry!
+                                        open_inline_entry(&mut st);
+                                    } else {
+                                        st.todo_selected_date = *day;
+                                        st.todo_scroll = 0;
+                                    }
+                                    handled = true;
+                                    break;
+                                }
+                            }
+                        }
+                        // Check task rows for selected date
+                        if !handled {
+                            let today = Local::now().date_naive();
+                            let visible_ids: Vec<i64> = if cal_on {
+                                tasks_for_date(&st.tasks, st.todo_selected_date, today)
+                                    .into_iter()
+                                    .map(|t| t.id)
+                                    .collect()
+                            } else {
+                                st.tasks.iter().map(|t| t.id).collect()
+                            };
+                            for (slot, rect) in tz.rows.iter().enumerate() {
+                                if rect.contains(cx, cy) {
+                                    if let Some(&task_id) = visible_ids.get(st.todo_scroll + slot) {
+                                        if let Some(ref db) = st.db {
+                                            let res = if st.todo_edit_mode {
+                                                db.delete_task(task_id)
+                                            } else {
+                                                db.toggle_task(task_id)
+                                            };
+                                            if let Ok(list) = res {
+                                                st.tasks = list;
+                                                let max_s = visible_ids.len().saturating_sub(3);
+                                                st.todo_scroll = st.todo_scroll.min(max_s);
+                                                if !st.todo_edit_mode {
+                                                    st.mascot_happy_boost = 1.0;
+                                                }
                                             }
                                         }
                                     }
+                                    handled = true;
+                                    break;
                                 }
-                                handled = true;
-                                break;
                             }
                         }
+                    }
+                }
+
+                // 5b. Widgets — click Quick Notes tile to copy note to clipboard
+                if !handled && st.sm.current == NotchState::Widgets {
+                    let wz = widgets_hit_zones(x, top_y, unit);
+                    let clicked_notes = (wz.left_tile.contains(cx, cy)
+                        && st.config.widgets.left == WidgetKind::QuickNotes)
+                        || (wz.right_tile.contains(cx, cy)
+                            && st.config.widgets.right == WidgetKind::QuickNotes);
+                    if clicked_notes {
+                        let _ = st.clip_copy_tx.try_send(st.telemetry.quick_note.clone());
+                        st.mascot_happy_boost = 1.0;
+                        handled = true;
                     }
                 }
 
@@ -1712,6 +1836,24 @@ pub fn build_notch_window(
                             st.pomodoro = PomodoroEngine::new(st.config.focus.clone());
                         }
                         st.prayer = compute_today_schedule(&st.config.prayer);
+                        if let Some(ref db) = st.db {
+                            if let Ok(note) = db.get_quick_note() {
+                                st.telemetry.quick_note = note;
+                            }
+                        }
+                        let (wl, wr) = (st.config.widgets.left, st.config.widgets.right);
+                        st.telemetry.refresh_for_slots(wl, wr);
+                        if st.telemetry.should_fetch_weather(wl, wr) {
+                            let city = st.config.prayer.city.clone();
+                            let lat = st.config.prayer.latitude;
+                            let lon = st.config.prayer.longitude;
+                            let tx_w = event_tx.clone();
+                            rt_handle.spawn(async move {
+                                if let Some(snap) = fetch_open_meteo(city, lat, lon).await {
+                                    let _ = tx_w.send(AppEvent::WeatherUpdated(snap)).await;
+                                }
+                            });
+                        }
 
                         if scale_changed {
                             let sc = st.config.appearance.scale;
@@ -1725,8 +1867,15 @@ pub fn build_notch_window(
                                 w.set_default_size(cw, ch);
                             }
                             if let Some(te) = todo_weak.upgrade() {
-                                te.set_width_request((230.0 * sc) as i32);
-                                te.set_margin_top((86.0 * sc) as i32);
+                                if st.config.widgets.show_todo_calendar {
+                                    te.set_width_request((244.0 * u) as i32);
+                                    te.set_margin_top((66.0 * u) as i32);
+                                    te.set_margin_start((174.0 * u) as i32);
+                                } else {
+                                    te.set_width_request((230.0 * sc) as i32);
+                                    te.set_margin_top((86.0 * sc) as i32);
+                                    te.set_margin_start(0);
+                                }
                             }
                             if let Some(ae) = ai_weak.upgrade() {
                                 ae.set_width_request((392.0 * u) as i32);
@@ -1735,6 +1884,9 @@ pub fn build_notch_window(
                             }
                             st.last_input_rect = None;
                         }
+                    }
+                    AppEvent::WeatherUpdated(snap) => {
+                        st.telemetry.weather = snap;
                     }
                     AppEvent::Quit => {
                         if let Some(a) = app_weak.upgrade() {

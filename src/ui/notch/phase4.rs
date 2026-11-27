@@ -1,6 +1,7 @@
 use crate::ai::AiResponse;
 use crate::quota::{QuotaSnapshot, QuotaStatus};
 use crate::ui::notch::renderer::RectF;
+use crate::ui::notch::text;
 use chrono::Local;
 use gtk4::cairo::{self, Context, LinearGradient};
 use std::f64::consts::PI;
@@ -273,11 +274,16 @@ pub fn draw_state_16_ai_answer(
     } else {
         "You: Ask UMI AI"
     };
-    cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
-    cr.set_font_size(11.0 * unit);
-    cr.set_source_rgba(1.0, 1.0, 1.0, 0.45 * alpha);
-    cr.move_to(x + 34.0 * unit, top_y + 47.0 * unit);
-    let _ = cr.show_text(&trunc(echo, 66));
+    text::draw_text_baseline(
+        cr,
+        echo,
+        x + 34.0 * unit,
+        top_y + 47.0 * unit,
+        Some(474.0 * unit),
+        11.0 * unit,
+        false,
+        (1.0, 1.0, 1.0, 0.45 * alpha),
+    );
 
     // Answer Card (34, 56, 478x72)
     rrect(cr, x + 34.0 * unit, top_y + 56.0 * unit, 478.0 * unit, 72.0 * unit, 12.0 * unit);
@@ -292,13 +298,17 @@ pub fn draw_state_16_ai_answer(
         "No answer yet."
     };
 
-    cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
-    cr.set_font_size(11.5 * unit);
-    cr.set_source_rgba(0.925, 0.933, 0.965, alpha);
-    for (idx, line) in wrap_lines(answer_body, 66, 3).iter().enumerate() {
-        cr.move_to(x + 46.0 * unit, top_y + (76.0 + idx as f64 * 17.5) * unit);
-        let _ = cr.show_text(line);
-    }
+    text::draw_text_wrapped(
+        cr,
+        answer_body,
+        x + 46.0 * unit,
+        top_y + 64.0 * unit,
+        454.0 * unit,
+        3,
+        11.5 * unit,
+        false,
+        (0.925, 0.933, 0.965, alpha),
+    );
 
     // Bottom buttons: Copy (34, 136, 56x22), Retry (96, 136, 56x22), Ask follow-up... (158, 136, 108x22)
     rrect(cr, x + 34.0 * unit, top_y + 136.0 * unit, 56.0 * unit, 22.0 * unit, 8.0 * unit);
@@ -507,39 +517,4 @@ fn trunc(s: &str, max_chars: usize) -> String {
     } else {
         head
     }
-}
-
-fn wrap_lines(text: &str, max_chars: usize, max_lines: usize) -> Vec<String> {
-    let mut out = Vec::new();
-    for raw in text.lines() {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let mut cur = String::new();
-        for word in trimmed.split_whitespace() {
-            if cur.is_empty() {
-                cur.push_str(word);
-            } else if cur.chars().count() + 1 + word.chars().count() <= max_chars {
-                cur.push(' ');
-                cur.push_str(word);
-            } else {
-                out.push(cur);
-                if out.len() >= max_lines {
-                    return out;
-                }
-                cur = word.to_string();
-            }
-        }
-        if !cur.is_empty() {
-            out.push(cur);
-            if out.len() >= max_lines {
-                return out;
-            }
-        }
-    }
-    if out.is_empty() {
-        out.push(trunc(text, max_chars));
-    }
-    out
 }

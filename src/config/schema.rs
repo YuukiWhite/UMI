@@ -219,9 +219,102 @@ impl Default for WaterConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FaithTradition {
+    Islam,
+    Kristen,
+    Katolik,
+    Hindu,
+    Buddha,
+    Khonghucu,
+}
+
+impl Default for FaithTradition {
+    fn default() -> Self {
+        Self::Islam
+    }
+}
+
+impl FaithTradition {
+    pub const ALL: &'static [Self] = &[
+        Self::Islam,
+        Self::Kristen,
+        Self::Katolik,
+        Self::Hindu,
+        Self::Buddha,
+        Self::Khonghucu,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Islam => "Islam",
+            Self::Kristen => "Kristen Protestan",
+            Self::Katolik => "Katolik",
+            Self::Hindu => "Hindu",
+            Self::Buddha => "Buddha",
+            Self::Khonghucu => "Khonghucu",
+        }
+    }
+
+    pub fn pill_label(self) -> &'static str {
+        match self {
+            Self::Islam => "☾ Islam",
+            Self::Kristen => "✝ Kristen",
+            Self::Katolik => "✦ Katolik",
+            Self::Hindu => "☀ Hindu",
+            Self::Buddha => "☸ Buddha",
+            Self::Khonghucu => "◈ Khonghucu",
+        }
+    }
+
+    pub fn notch_header(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Islam => ("Prayer", "Islam"),
+            Self::Kristen => ("Devotion", "Kristen Protestan"),
+            Self::Katolik => ("Devotion", "Katolik · Angelus"),
+            Self::Hindu => ("Tri Sandhya", "Hindu · Nusantara"),
+            Self::Buddha => ("Puja Bakti", "Buddha · Meditasi"),
+            Self::Khonghucu => ("Sembahyang", "Khonghucu"),
+        }
+    }
+
+    pub fn default_slots(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            Self::Islam => &[],
+            Self::Kristen => &[
+                ("Saat Teduh Pagi", "06:00"),
+                ("Doa Siang", "12:00"),
+                ("Renungan Malam", "21:00"),
+            ],
+            Self::Katolik => &[
+                ("Angelus Pagi", "06:00"),
+                ("Angelus Siang", "12:00"),
+                ("Angelus Sore", "18:00"),
+                ("Kompletorium", "21:00"),
+            ],
+            Self::Hindu => &[
+                ("Pagi (Surya)", "06:00"),
+                ("Siang (Madhya)", "12:00"),
+                ("Sore (Sandhya)", "18:00"),
+            ],
+            Self::Buddha => &[
+                ("Puja Bakti Pagi", "06:00"),
+                ("Meditasi Siang (10m)", "12:30"),
+                ("Puja Bakti Malam", "19:30"),
+            ],
+            Self::Khonghucu => &[
+                ("Sembahyang Pagi (Dupa)", "06:00"),
+                ("Sembahyang Sore (Renungan)", "18:00"),
+            ],
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PrayerConfig {
+    pub faith: FaithTradition,
     pub auto_location: bool,
     pub city: String,
     pub latitude: f64,
@@ -230,11 +323,15 @@ pub struct PrayerConfig {
     pub auto_pause_music: bool,
     pub pre_nudge_min: u32,
     pub show_sun_arc: bool,
+    pub show_feast_reminder: bool,
+    /// Optional custom HH:MM overrides for non-Islam traditions (same order as default_slots).
+    pub custom_slots: Vec<String>,
 }
 
 impl Default for PrayerConfig {
     fn default() -> Self {
         Self {
+            faith: FaithTradition::Islam,
             auto_location: true,
             city: "Surabaya".to_string(),
             latitude: -7.2914,
@@ -243,6 +340,121 @@ impl Default for PrayerConfig {
             auto_pause_music: true,
             pre_nudge_min: 10,
             show_sun_arc: true,
+            show_feast_reminder: true,
+            custom_slots: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WidgetKind {
+    ThisWeek,
+    Battery,
+    SystemMonitor,
+    Weather,
+    NetworkSpeed,
+    WorldClock,
+    QuickNotes,
+    DiskThermal,
+}
+
+impl Default for WidgetKind {
+    fn default() -> Self {
+        Self::ThisWeek
+    }
+}
+
+impl WidgetKind {
+    pub const ALL: &'static [Self] = &[
+        Self::ThisWeek,
+        Self::Battery,
+        Self::SystemMonitor,
+        Self::Weather,
+        Self::NetworkSpeed,
+        Self::WorldClock,
+        Self::QuickNotes,
+        Self::DiskThermal,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::ThisWeek => "This Week",
+            Self::Battery => "Battery & Power",
+            Self::SystemMonitor => "System Monitor",
+            Self::Weather => "Weather (Cuaca)",
+            Self::NetworkSpeed => "Network Speed",
+            Self::WorldClock => "World Clock",
+            Self::QuickNotes => "Quick Notes",
+            Self::DiskThermal => "Disk & Thermal",
+        }
+    }
+
+    pub fn short_title(self) -> &'static str {
+        match self {
+            Self::ThisWeek => "Week",
+            Self::Battery => "Battery",
+            Self::SystemMonitor => "System",
+            Self::Weather => "Weather",
+            Self::NetworkSpeed => "Network",
+            Self::WorldClock => "Clock",
+            Self::QuickNotes => "Notes",
+            Self::DiskThermal => "Storage",
+        }
+    }
+
+    pub fn glyph(self) -> &'static str {
+        match self {
+            Self::ThisWeek => "▦",
+            Self::Battery => "⚡",
+            Self::SystemMonitor => "▣",
+            Self::Weather => "☀",
+            Self::NetworkSpeed => "⇅",
+            Self::WorldClock => "◷",
+            Self::QuickNotes => "✎",
+            Self::DiskThermal => "◉",
+        }
+    }
+
+    pub fn subtitle(self) -> &'static str {
+        match self {
+            Self::ThisWeek => "Kalender 7 hari & task aktif",
+            Self::Battery => "UPower ring · status baterai",
+            Self::SystemMonitor => "CPU & RAM live via /proc",
+            Self::Weather => "Open-Meteo · tanpa API key",
+            Self::NetworkSpeed => "↓ Down / ↑ Up · Wi-Fi SSID",
+            Self::WorldClock => "3 zona waktu offline (WIB/JST)",
+            Self::QuickNotes => "Catatan tempel 3 baris (SQLite)",
+            Self::DiskThermal => "SSD / usage & suhu CPU / NVMe",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WidgetsConfig {
+    pub left: WidgetKind,
+    pub right: WidgetKind,
+    pub refresh_secs: u32,
+    pub week_starts_monday: bool,
+    pub show_todo_calendar: bool,
+    /// Up to 3 pinned timezone labels + UTC offset hours.
+    pub world_clock_zones: Vec<(String, i32)>,
+}
+
+impl Default for WidgetsConfig {
+    fn default() -> Self {
+        Self {
+            left: WidgetKind::ThisWeek,
+            right: WidgetKind::Battery,
+            refresh_secs: 2,
+            week_starts_monday: true,
+            show_todo_calendar: true,
+            world_clock_zones: vec![
+                ("Surabaya (WIB)".to_string(), 7),
+                ("Tokyo (JST)".to_string(), 9),
+                ("London (UTC)".to_string(), 0),
+            ],
         }
     }
 }
@@ -289,6 +501,7 @@ pub struct UmiConfig {
     pub focus: FocusConfig,
     pub water: WaterConfig,
     pub prayer: PrayerConfig,
+    pub widgets: WidgetsConfig,
     pub ai: AiConfig,
 }
 
@@ -301,6 +514,7 @@ impl Default for UmiConfig {
             focus: FocusConfig::default(),
             water: WaterConfig::default(),
             prayer: PrayerConfig::default(),
+            widgets: WidgetsConfig::default(),
             ai: AiConfig::default(),
         }
     }

@@ -6,6 +6,7 @@ use crate::quota::QuotaStatus;
 use crate::state::{ClipboardEntry, LyricsData, MediaSnapshot};
 use crate::ui::notch::phase3::{self, Phase3Data};
 use crate::ui::notch::phase4::{self, Phase4Data};
+use crate::ui::notch::text;
 use chrono::{Local, Timelike};
 use gtk4::cairo::{self, Context, ImageSurface, LinearGradient};
 use std::f64::consts::PI;
@@ -901,26 +902,16 @@ fn draw_peek_shell(cr: &Context, frame: &RenderFrame, top_y: f64, state: &NotchS
             cr.close_path();
             let _ = cr.fill();
 
+            text::draw_text_baseline(cr, app, x + 72.0 * unit, top_y + 26.0 * unit, Some(270.0 * unit), 11.0 * unit, false, (1.0, 1.0, 1.0, 0.45));
+
             cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
             cr.set_font_size(11.0 * unit);
             cr.set_source_rgba(1.0, 1.0, 1.0, 0.45);
-            cr.move_to(x + 72.0 * unit, top_y + 26.0 * unit);
-            let _ = cr.show_text(&truncate_text(app, 24));
-
             cr.move_to(x + 355.0 * unit, top_y + 26.0 * unit);
             let _ = cr.show_text("now");
 
-            cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
-            cr.set_font_size(14.0 * unit);
-            cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
-            cr.move_to(x + 72.0 * unit, top_y + 44.5 * unit);
-            let _ = cr.show_text(&truncate_text(sender, 28));
-
-            cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
-            cr.set_font_size(12.0 * unit);
-            cr.set_source_rgba(1.0, 1.0, 1.0, 0.66);
-            cr.move_to(x + 72.0 * unit, top_y + 62.5 * unit);
-            let _ = cr.show_text(&truncate_text(body, 38));
+            text::draw_text_baseline(cr, sender, x + 72.0 * unit, top_y + 44.5 * unit, Some(300.0 * unit), 14.0 * unit, true, (1.0, 1.0, 1.0, 1.0));
+            text::draw_text_baseline(cr, body, x + 72.0 * unit, top_y + 62.5 * unit, Some(310.0 * unit), 12.0 * unit, false, (1.0, 1.0, 1.0, 0.66));
         }
         NotchState::Headphones { device, battery_pct } => {
             // 04 · Headphones: #5EC2FF ring + Bluetooth rune + right #0D1A26 headphones badge
@@ -1135,6 +1126,12 @@ fn draw_expanded_shell(
                 cr.move_to(x + 24.0 * unit + w1, top_y + 23.0 * unit);
                 let _ = cr.show_text("Reminder");
             }
+            NotchPageId::Prayer => {
+                let (head_title, _) = live.phase3.prayer.faith.notch_header();
+                cr.set_source_rgba(0.925, 0.937, 0.969, alpha);
+                cr.move_to(x + 24.0 * unit, top_y + 23.0 * unit);
+                let _ = cr.show_text(head_title);
+            }
             NotchPageId::Todo => {
                 cr.set_source_rgba(0.925, 0.937, 0.969, alpha);
                 cr.move_to(x + 24.0 * unit, top_y + 23.0 * unit);
@@ -1142,7 +1139,31 @@ fn draw_expanded_shell(
                 let w1 = cr.text_extents("Todo").map(|e| e.x_advance()).unwrap_or(36.0 * unit);
                 cr.set_source_rgba(0.216, 0.827, 0.435, alpha); // #37D36F
                 cr.move_to(x + 24.0 * unit + w1, top_y + 23.0 * unit);
-                let _ = cr.show_text("List");
+                let _ = cr.show_text(if cfg.widgets.show_todo_calendar {
+                    " Calendar"
+                } else {
+                    "List"
+                });
+            }
+            NotchPageId::Widgets => {
+                cr.set_source_rgba(0.925, 0.937, 0.969, alpha);
+                cr.move_to(x + 24.0 * unit, top_y + 23.0 * unit);
+                let _ = cr.show_text("Widgets");
+                let pair_sub = format!(
+                    "{} · {}",
+                    cfg.widgets.left.short_title(),
+                    cfg.widgets.right.short_title()
+                );
+                text::draw_text_baseline(
+                    cr,
+                    &pair_sub,
+                    x + 84.0 * unit,
+                    top_y + 23.0 * unit,
+                    Some(92.0 * unit),
+                    10.2 * unit,
+                    false,
+                    (0.490, 0.827, 0.988, 0.85 * alpha),
+                );
             }
             NotchPageId::AskAi => {
                 cr.set_source_rgba(0.925, 0.937, 0.969, alpha);
@@ -1383,17 +1404,26 @@ fn draw_state_06_music(cr: &Context, frame: &RenderFrame, top_y: f64, live: &Liv
         "Play Spotify, YouTube, or YouTube Music"
     };
 
-    cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
-    cr.set_font_size(14.5 * unit);
-    cr.set_source_rgba(1.0, 1.0, 1.0, alpha);
-    cr.move_to(x + 114.0 * unit, top_y + 58.0 * unit);
-    let _ = cr.show_text(&truncate_text(title, 34));
-
-    cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
-    cr.set_font_size(12.0 * unit);
-    cr.set_source_rgba(1.0, 1.0, 1.0, 0.45 * alpha);
-    cr.move_to(x + 114.0 * unit, top_y + 78.0 * unit);
-    let _ = cr.show_text(&truncate_text(artist, 40));
+    text::draw_text_baseline(
+        cr,
+        title,
+        x + 114.0 * unit,
+        top_y + 58.0 * unit,
+        Some(370.0 * unit),
+        14.5 * unit,
+        true,
+        (1.0, 1.0, 1.0, alpha),
+    );
+    text::draw_text_baseline(
+        cr,
+        artist,
+        x + 114.0 * unit,
+        top_y + 78.0 * unit,
+        Some(370.0 * unit),
+        12.0 * unit,
+        false,
+        (1.0, 1.0, 1.0, 0.45 * alpha),
+    );
 
     // Elapsed / Seekable Progress Bar / Remaining (y = 118..127)
     let pos_us = live.media.live_position_us();
@@ -1487,17 +1517,26 @@ fn draw_state_08_lyrics_wide(
         "Spotify · YouTube · YTM"
     };
 
-    cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
-    cr.set_font_size(14.0 * unit);
-    cr.set_source_rgba(1.0, 1.0, 1.0, alpha);
-    cr.move_to(x + 112.0 * unit, top_y + 54.0 * unit);
-    let _ = cr.show_text(&truncate_text(title, 21));
-
-    cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
-    cr.set_font_size(11.5 * unit);
-    cr.set_source_rgba(1.0, 1.0, 1.0, 0.52 * alpha);
-    cr.move_to(x + 112.0 * unit, top_y + 74.0 * unit);
-    let _ = cr.show_text(&truncate_text(artist, 25));
+    text::draw_text_baseline(
+        cr,
+        title,
+        x + 112.0 * unit,
+        top_y + 54.0 * unit,
+        Some(182.0 * unit),
+        14.0 * unit,
+        true,
+        (1.0, 1.0, 1.0, alpha),
+    );
+    text::draw_text_baseline(
+        cr,
+        artist,
+        x + 112.0 * unit,
+        top_y + 74.0 * unit,
+        Some(182.0 * unit),
+        11.5 * unit,
+        false,
+        (1.0, 1.0, 1.0, 0.52 * alpha),
+    );
 
     let pos_us = live.media.live_position_us();
     let dur_us = live.media.duration_us;
@@ -1576,17 +1615,14 @@ fn draw_state_08_lyrics_wide(
             let center_y = top_y + 90.0 * unit;
             let line_step = 50.0 * unit;
             let base = scroll.floor() as isize;
-            let base_font_sz = 16.2 * unit;
-
-            cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Bold);
-            cr.set_font_size(base_font_sz);
+            let base_font_sz = 16.0 * unit;
 
             for offset in -2..=3 {
                 let i = base + offset;
                 if i < 0 || i as usize >= lines.len() {
                     continue;
                 }
-                let text = lines[i as usize].text.as_str();
+                let line_text = lines[i as usize].text.as_str();
                 let delta = i as f64 - scroll;
                 let dist = delta.abs();
                 let focus_raw = (1.0 - dist.min(1.0)).clamp(0.0, 1.0);
@@ -1598,37 +1634,37 @@ fn draw_state_08_lyrics_wide(
                 }
 
                 let y = center_y + delta * line_step;
-                // Continuous subpixel scale transform (0.83 -> 1.0) with zero font-hinting staircase
+                // Continuous subpixel scale transform (0.83 -> 1.0) with PangoCairo full Unicode/CJK fallback
                 let s = 0.83 + 0.17 * focus;
-                let (l1, l2) = wrap_two_lines(text, 34);
-
                 let _ = cr.save();
                 cr.translate(lx, y);
                 cr.scale(s, s);
-                cr.set_source_rgba(1.0, 1.0, 1.0, line_alpha);
-                if let Some(second) = l2 {
-                    cr.move_to(0.0, -5.0 * unit);
-                    let _ = cr.show_text(&l1);
-                    cr.move_to(0.0, 14.5 * unit);
-                    let _ = cr.show_text(&second);
-                } else {
-                    cr.move_to(0.0, 5.0 * unit);
-                    let _ = cr.show_text(&l1);
-                }
+                text::draw_text_centered_y(
+                    cr,
+                    line_text,
+                    0.0,
+                    0.0,
+                    pane_w / s,
+                    2,
+                    base_font_sz,
+                    true,
+                    (1.0, 1.0, 1.0, line_alpha),
+                );
                 let _ = cr.restore();
             }
         }
         LyricsData::Plain(lines) if !lines.is_empty() => {
             for (i, line) in lines.iter().take(3).enumerate() {
-                cr.select_font_face(
-                    "Inter",
-                    cairo::FontSlant::Normal,
-                    if i == 1 { cairo::FontWeight::Bold } else { cairo::FontWeight::Normal },
+                text::draw_text_baseline(
+                    cr,
+                    line,
+                    lx,
+                    top_y + (44.0 + i as f64 * 42.0) * unit,
+                    Some(pane_w),
+                    (if i == 1 { 15.5 } else { 13.5 }) * unit,
+                    i == 1,
+                    (1.0, 1.0, 1.0, (if i == 1 { 0.95 } else { 0.40 }) * alpha),
                 );
-                cr.set_font_size((if i == 1 { 15.5 } else { 13.5 }) * unit);
-                cr.set_source_rgba(1.0, 1.0, 1.0, (if i == 1 { 0.95 } else { 0.40 }) * alpha);
-                cr.move_to(lx, top_y + (44.0 + i as f64 * 42.0) * unit);
-                let _ = cr.show_text(&truncate_text(line, 36));
             }
         }
         LyricsData::Loading => {
@@ -1677,16 +1713,17 @@ fn draw_state_12_clipboard(cr: &Context, frame: &RenderFrame, top_y: f64, live: 
         let _ = cr.fill();
 
         if let Some(entry) = live.clipboard.get(idx) {
-            let (l1, l2) = wrap_two_lines(&entry.text, 13);
-            cr.select_font_face("Inter", cairo::FontSlant::Normal, cairo::FontWeight::Normal);
-            cr.set_font_size(10.5 * unit);
-            cr.set_source_rgba(1.0, 1.0, 1.0, 0.85 * alpha);
-            cr.move_to(cx + 9.0 * unit, cy + 20.0 * unit);
-            let _ = cr.show_text(&l1);
-            if let Some(line2) = l2 {
-                cr.move_to(cx + 9.0 * unit, cy + 35.0 * unit);
-                let _ = cr.show_text(&line2);
-            }
+            text::draw_text_wrapped(
+                cr,
+                &entry.text,
+                cx + 9.0 * unit,
+                cy + 10.0 * unit,
+                cw - 18.0 * unit,
+                3,
+                10.5 * unit,
+                false,
+                (1.0, 1.0, 1.0, 0.85 * alpha),
+            );
 
             let age = if is_copied {
                 "Copied!".to_string()
@@ -1930,33 +1967,6 @@ fn truncate_text(s: &str, max_chars: usize) -> String {
     }
 }
 
-fn wrap_two_lines(s: &str, line_chars: usize) -> (String, Option<String>) {
-    let clean = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    if clean.chars().count() <= line_chars {
-        return (clean, None);
-    }
-    let mut line1 = String::new();
-    let mut rest = String::new();
-    for word in clean.split_whitespace() {
-        if rest.is_empty() && (line1.len() + word.len() + 1 <= line_chars || line1.is_empty()) {
-            if !line1.is_empty() {
-                line1.push(' ');
-            }
-            line1.push_str(word);
-        } else {
-            if !rest.is_empty() {
-                rest.push(' ');
-            }
-            rest.push_str(word);
-        }
-    }
-    if rest.is_empty() {
-        (truncate_text(&line1, line_chars), None)
-    } else {
-        (truncate_text(&line1, line_chars), Some(truncate_text(&rest, line_chars)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2029,6 +2039,8 @@ mod tests {
             },
         ];
 
+        let sample_tel = crate::sys::telemetry::WidgetTelemetry::default();
+        let today = chrono::Local::now().date_naive();
         let live = LiveData {
             battery_pct: 84,
             media: &sample_media,
@@ -2046,8 +2058,12 @@ mod tests {
                 tasks: &[],
                 todo_edit_mode: false,
                 todo_scroll: 0,
+                todo_selected_date: today,
+                todo_entry_open: false,
                 battery_pct: 84,
                 battery_charging: true,
+                widgets_cfg: &cfg.widgets,
+                telemetry: &sample_tel,
             },
             phase4: Phase4Data {
                 translate_mode: false,
@@ -2167,9 +2183,9 @@ mod tests {
             hourly_ml: [250, 0, 250, 250, 0, 250, 250, 0],
         };
         let tasks = vec![
-            crate::storage::TaskItem { id: 1, title: "Polish UMI mascot expressions".into(), completed: true },
-            crate::storage::TaskItem { id: 2, title: "Ship Pure Rust Wayland release".into(), completed: true },
-            crate::storage::TaskItem { id: 3, title: "Record demo screenshots for README".into(), completed: false },
+            crate::storage::TaskItem { id: 1, title: "Polish UMI mascot expressions".into(), completed: true, due_date: None },
+            crate::storage::TaskItem { id: 2, title: "Ship Pure Rust Wayland release".into(), completed: true, due_date: None },
+            crate::storage::TaskItem { id: 3, title: "Record demo screenshots for README".into(), completed: false, due_date: None },
         ];
         let media = MediaSnapshot {
             bus_name: Some("spotify".into()),
@@ -2208,6 +2224,8 @@ mod tests {
                 updated_at: 0,
             },
         ];
+        let sample_tel = crate::sys::telemetry::WidgetTelemetry::default();
+        let today = chrono::Local::now().date_naive();
         let live = LiveData {
             battery_pct: 84,
             media: &media,
@@ -2225,8 +2243,12 @@ mod tests {
                 tasks: &tasks,
                 todo_edit_mode: false,
                 todo_scroll: 0,
+                todo_selected_date: today,
+                todo_entry_open: false,
                 battery_pct: 84,
                 battery_charging: true,
+                widgets_cfg: &cfg.widgets,
+                telemetry: &sample_tel,
             },
             phase4: Phase4Data {
                 translate_mode: false,
@@ -2377,5 +2399,142 @@ mod tests {
             drop(cr);
             save_ppm(surf, "/tmp/umi-readme-showcase.ppm");
         }
+    }
+
+    #[test]
+    fn renders_v14_cjk_lyrics_and_v2_features_to_png() {
+        use crate::config::{FaithTradition, WidgetKind};
+        use crate::domain::pomodoro::PomodoroEngine;
+        use crate::domain::prayer_calc::compute_today_schedule;
+        use crate::lyrics::LyricLine;
+        use crate::storage::{TaskItem, WaterSummary};
+        use crate::sys::telemetry::WidgetTelemetry;
+
+        let mut cfg = UmiConfig::default();
+        cfg.appearance.scale = 1.3;
+        cfg.prayer.faith = FaithTradition::Hindu;
+        cfg.widgets.left = WidgetKind::SystemMonitor;
+        cfg.widgets.right = WidgetKind::NetworkSpeed;
+
+        let pomo = PomodoroEngine::new(cfg.focus.clone());
+        let prayer = compute_today_schedule(&cfg.prayer);
+        let water = WaterSummary::default();
+        let today = chrono::Local::now().date_naive();
+        let today_s = today.format("%Y-%m-%d").to_string();
+        let tomorrow_s = (today + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let tasks = vec![
+            TaskItem { id: 1, title: "テスト日本語タスク · Review v1.4".into(), completed: true, due_date: Some(today_s.clone()) },
+            TaskItem { id: 2, title: "Meeting sprint jam 10:00".into(), completed: false, due_date: Some(today_s) },
+            TaskItem { id: 3, title: "Rilis AppImage v1.4.0".into(), completed: false, due_date: Some(tomorrow_s) },
+        ];
+        let mut tel = WidgetTelemetry::default();
+        tel.cpu_pct = 24.0;
+        tel.ram_used_gb = 6.2;
+        tel.ram_total_gb = 16.0;
+        tel.ram_pct = 39.0;
+        tel.load_avg = 0.42;
+        tel.cpu_temp_c = Some(48.0);
+        tel.net_down_bps = 14.2 * 1024.0 * 1024.0;
+        tel.net_up_bps = 2.8 * 1024.0 * 1024.0;
+        tel.net_iface = "Wi-Fi · wlp2s0".into();
+
+        let media = MediaSnapshot {
+            bus_name: Some("spotify".into()),
+            title: "夜に駆ける / 晴天".into(),
+            artist: "YOASOBI · 周杰倫 · 아이유".into(),
+            playing: true,
+            duration_us: 260_000_000,
+            position_us: 82_000_000,
+            position_synced_at: None,
+            art_path: None,
+        };
+        let lyrics = LyricsData::Synced(vec![
+            LyricLine { time_ms: 74_000, text: "沈むように溶けてゆくように".into() },
+            LyricLine { time_ms: 80_000, text: "故事的小黃花 从出生那年就飘着".into() },
+            LyricLine { time_ms: 88_000, text: "이 밤 그날의 반딧불을 당신의 창 가까이".into() },
+        ]);
+
+        let live = LiveData {
+            battery_pct: 88,
+            media: &media,
+            album_art: None,
+            lyrics: &lyrics,
+            lyrics_scroll_idx: 1.0,
+            clipboard: &[],
+            copied_flash_idx: None,
+            phase3: Phase3Data {
+                pomodoro: &pomo,
+                prayer: &prayer,
+                water: &water,
+                shelf: &[],
+                shelf_drag_over: false,
+                tasks: &tasks,
+                todo_edit_mode: false,
+                todo_scroll: 0,
+                todo_selected_date: today,
+                todo_entry_open: false,
+                battery_pct: 88,
+                battery_charging: true,
+                widgets_cfg: &cfg.widgets,
+                telemetry: &tel,
+            },
+            phase4: Phase4Data {
+                translate_mode: false,
+                ai_loading: false,
+                ai_response: None,
+                ai_copied_flash: false,
+                quotas: &[],
+            },
+            ai_entry_visible: false,
+        };
+
+        let surf = cairo::ImageSurface::create(cairo::Format::ARgb32, 1460, 480).expect("surf");
+        let cr = Context::new(&surf).expect("cr");
+        cr.set_source_rgb(0.02, 0.03, 0.06);
+        let _ = cr.paint();
+
+        let cards: [(NotchState, f64, f64, f64); 4] = [
+            (NotchState::Lyrics, 20.0, 20.0, 700.0),
+            (NotchState::Prayer, 740.0, 20.0, 700.0),
+            (NotchState::Todo, 20.0, 250.0, 700.0),
+            (NotchState::Widgets, 740.0, 250.0, 700.0),
+        ];
+        for (st, px, py, cw) in cards {
+            let mut sm = StateMachine::new(cfg.pages.active.clone(), true);
+            match st {
+                NotchState::Prayer => sm.jump_to_page(NotchPageId::Prayer),
+                NotchState::Todo => sm.jump_to_page(NotchPageId::Todo),
+                NotchState::Widgets => sm.jump_to_page(NotchPageId::Widgets),
+                _ => sm.current = st,
+            }
+            let geom = sm.current.tier(false).geometry();
+            let mut spring = NotchSpring::new(geom.width_dp, geom.height_dp, geom.bottom_radius_dp, geom.ear_radius_dp);
+            spring.expanded_mix.value = 1.0;
+
+            let sub = cairo::ImageSurface::create(cairo::Format::ARgb32, cw as i32, 210).expect("sub");
+            let sub_cr = Context::new(&sub).expect("sub_cr");
+            let frame = RenderFrame::from_state(cw, 210.0, &spring, 1.24, 1.0, false, false);
+            draw_notch(&sub_cr, &frame, &sm, &cfg, &live);
+            let _ = cr.set_source_surface(&sub, px, py);
+            let _ = cr.paint();
+        }
+        drop(cr);
+        let mut s_mut = surf;
+        let w = s_mut.width() as usize;
+        let h = s_mut.height() as usize;
+        let stride = s_mut.stride() as usize;
+        let data = s_mut.data().expect("surface data");
+        let mut ppm = format!("P6\n{w} {h}\n255\n").into_bytes();
+        ppm.reserve(w * h * 3);
+        for row in 0..h {
+            for col in 0..w {
+                let off = row * stride + col * 4;
+                ppm.push(data[off + 2]);
+                ppm.push(data[off + 1]);
+                ppm.push(data[off]);
+            }
+        }
+        std::fs::write("/tmp/umi-v14-verify.ppm", ppm).expect("write ppm");
+        assert!(std::path::Path::new("/tmp/umi-v14-verify.ppm").exists());
     }
 }

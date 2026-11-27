@@ -5,6 +5,7 @@ use crate::ai::AiResponse;
 use crate::config::{NotchPageId, UmiConfig};
 use crate::lyrics::LyricLine;
 use crate::quota::QuotaSnapshot;
+use crate::sys::telemetry::WeatherSnapshot;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -117,4 +118,6 @@ pub enum AppEvent {
     },
     // Phase 5 live Settings synchronization
     ConfigChanged(UmiConfig),
+    // v1.4 live weather widget snapshot
+    WeatherUpdated(WeatherSnapshot),
 }

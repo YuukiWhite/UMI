@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           umi
-Version:        1.3.1
+Version:        1.4.0
 Release:        1%{?dist}
 Summary:        UMI — Ambient Dynamic Island Companion for KDE Plasma Wayland
 License:        MIT

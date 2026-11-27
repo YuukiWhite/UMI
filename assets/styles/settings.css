@@ -333,3 +333,102 @@ separator.umi-sep {
     min-height: 1px;
     margin: 4px 0;
 }
+
+.umi-badge-widgets {
+    background-color: #0284C7;
+    color: #FFFFFF;
+}
+
+button.umi-faith-pill {
+    background-color: rgba(255, 255, 255, 0.045);
+    background-image: none;
+    border: 1px solid rgba(236, 239, 247, 0.10);
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: #CBD5E1;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+button.umi-faith-pill:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    color: #FFFFFF;
+}
+
+button.umi-faith-pill.active {
+    background-color: rgba(245, 158, 11, 0.18);
+    border-color: rgba(245, 158, 11, 0.65);
+    color: #FCD34D;
+    font-weight: 700;
+}
+
+.umi-slot-preview-left {
+    background-color: rgba(15, 29, 51, 0.90);
+    border: 1.2px solid rgba(56, 189, 248, 0.55);
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+.umi-slot-preview-right {
+    background-color: rgba(15, 33, 27, 0.90);
+    border: 1.2px solid rgba(48, 199, 89, 0.55);
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+.umi-slot-tag-left {
+    color: #38BDF8;
+    font-size: 9.5px;
+    font-weight: 800;
+}
+
+.umi-slot-tag-right {
+    color: #4ADE80;
+    font-size: 9.5px;
+    font-weight: 800;
+}
+
+.umi-widget-card {
+    background-color: #12182A;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+.umi-widget-card.slot-left {
+    background-color: #101D33;
+    border-color: rgba(56, 189, 248, 0.55);
+}
+
+.umi-widget-card.slot-right {
+    background-color: #10211B;
+    border-color: rgba(48, 199, 89, 0.55);
+}
+
+button.umi-slot-btn {
+    background-color: #1B243B;
+    background-image: none;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: #CBD5E1;
+    font-size: 10px;
+    font-weight: 600;
+    box-shadow: none;
+    min-height: 22px;
+}
+
+button.umi-slot-btn.active-left {
+    background-color: #0284C7;
+    border-color: transparent;
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+button.umi-slot-btn.active-right {
+    background-color: #22A550;
+    border-color: transparent;
+    color: #FFFFFF;
+    font-weight: 700;
+}

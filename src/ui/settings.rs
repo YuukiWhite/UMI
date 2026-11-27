@@ -1,5 +1,6 @@
 use crate::config::{
-    self, AiConfig, MascotEyeTint, NotchPageId, NotchStyle, SpringSpeed, UmiConfig,
+    self, AiConfig, FaithTradition, MascotEyeTint, NotchPageId, NotchStyle, SpringSpeed, UmiConfig,
+    WidgetKind,
 };
 use crate::domain::prayer_calc::compute_today_schedule;
 use crate::state::AppEvent;
@@ -211,9 +212,10 @@ pub fn build_settings_window(
         ("appearance", "Appearance", "✦", "umi-badge-appearance"),
         ("pages", "Notch Pages", "▤", "umi-badge-pages"),
         ("focus", "Focus & Water", "◷", "umi-badge-focus"),
-        ("prayer", "Prayer Times", "☾", "umi-badge-prayer"),
+        ("prayer", "Prayer & Devotion", "☾", "umi-badge-prayer"),
         ("ai", "AI & Shortcuts", "✧", "umi-badge-ai"),
         ("about", "About & Data", "◈", "umi-badge-about"),
+        ("widgets", "Widgets & Calendar", "▦", "umi-badge-widgets"),
     ];
 
     let nav_buttons: Rc<RefCell<Vec<(String, Button)>>> = Rc::new(RefCell::new(Vec::new()));
@@ -266,7 +268,7 @@ pub fn build_settings_window(
     privacy.set_margin_bottom(2);
     sidebar.append(&privacy);
 
-    // Build all 7 screens
+    // Build all 8 screens (matching unified FigCraft Settings Feature)
     stack.add_named(&wrap_scroll(build_screen_general(&ctx, Rc::clone(&select_tab))), Some("general"));
     stack.add_named(&wrap_scroll(build_screen_appearance(&ctx)), Some("appearance"));
     stack.add_named(&wrap_scroll(build_screen_pages(&ctx)), Some("pages"));
@@ -274,6 +276,7 @@ pub fn build_settings_window(
     stack.add_named(&wrap_scroll(build_screen_prayer(&ctx)), Some("prayer"));
     stack.add_named(&wrap_scroll(build_screen_ai(&ctx)), Some("ai"));
     stack.add_named(&wrap_scroll(build_screen_about(&ctx)), Some("about"));
+    stack.add_named(&wrap_scroll(build_screen_widgets_calendar(&ctx)), Some("widgets"));
 
     select_tab(initial_tab);
 
@@ -1455,22 +1458,64 @@ fn build_screen_focus_water(ctx: &SettingsCtx) -> GtkBox {
 }
 
 /// Screen 5 · Prayer Times & Location
+/// Screen 5 · Multi-Faith Prayer & Devotion (6 Traditions in Indonesia — FigCraft 05 & 05b)
 fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
     let page = GtkBox::new(Orientation::Vertical, 12);
     page.append(&page_header(
-        "Prayer Times & Location",
-        "Local sun-arc calculation, city detection, and media auto-pause.",
+        "Prayer & Devotion (Multi-Faith)",
+        "Select faith tradition (6 faiths in Indonesia), offline schedule, location & media auto-pause.",
     ));
 
-    // Live 5-Prayer Schedule Banner
-    let sched_hdr = section_label("TODAY'S LOCAL SCHEDULE");
-    page.append(&sched_hdr);
+    let cfg_init = ctx.cfg.borrow().clone();
 
+    // 6-Faith Selector Strip (Islam, Kristen, Katolik, Hindu, Buddha, Khonghucu)
+    let faith_strip = GtkBox::new(Orientation::Horizontal, 6);
+    faith_strip.set_homogeneous(true);
+    let faith_btns: Rc<RefCell<Vec<(FaithTradition, Button)>>> = Rc::new(RefCell::new(Vec::new()));
+
+    // Dynamic Schedule Banner
+    let sched_hdr = section_label("TODAY'S LOCAL SCHEDULE");
     let sched_strip = GtkBox::new(Orientation::Horizontal, 8);
     sched_strip.set_homogeneous(true);
+    let feast_banner = Label::new(None);
+    feast_banner.add_css_class("umi-row-sub");
+    feast_banner.set_xalign(0.0);
+
+    // Conditional Islam vs Non-Islam containers
+    let islam_box = GtkBox::new(Orientation::Vertical, 10);
+    let other_box = GtkBox::new(Orientation::Vertical, 10);
+    let custom_entry = Entry::new();
+    custom_entry.add_css_class("umi-settings-entry");
+    custom_entry.set_hexpand(true);
+
+    let sync_custom_entry_text = {
+        let ce = custom_entry.clone();
+        let cfg_rc = Rc::clone(&ctx.cfg);
+        Rc::new(move || {
+            let p = cfg_rc.borrow().prayer.clone();
+            let slots: Vec<String> = p
+                .faith
+                .default_slots()
+                .iter()
+                .enumerate()
+                .map(|(i, (_, def))| {
+                    p.custom_slots
+                        .get(i)
+                        .filter(|s| !s.trim().is_empty())
+                        .cloned()
+                        .unwrap_or_else(|| (*def).to_string())
+                })
+                .collect();
+            ce.set_text(&slots.join(", "));
+        })
+    };
+
     let render_schedule = {
         let strip = sched_strip.clone();
         let hdr = sched_hdr.clone();
+        let fb = feast_banner.clone();
+        let ib = islam_box.clone();
+        let ob = other_box.clone();
         let cfg_rc = Rc::clone(&ctx.cfg);
         Rc::new(move || {
             while let Some(c) = strip.first_child() {
@@ -1478,10 +1523,30 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
             }
             let p_cfg = cfg_rc.borrow().prayer.clone();
             let sched = compute_today_schedule(&p_cfg);
-            hdr.set_text(&format!(
-                "TODAY'S LOCAL SCHEDULE · {} (SUN ARC)",
-                p_cfg.city.to_uppercase()
-            ));
+            let is_islam = p_cfg.faith == FaithTradition::Islam;
+            ib.set_visible(is_islam);
+            ob.set_visible(!is_islam);
+
+            if is_islam {
+                hdr.set_text(&format!(
+                    "TODAY'S LOCAL SCHEDULE · {} (SUN ARC)",
+                    p_cfg.city.to_uppercase()
+                ));
+            } else {
+                hdr.set_text(&format!(
+                    "TODAY'S SCHEDULE · {} ({})",
+                    p_cfg.faith.notch_header().0.to_uppercase(),
+                    p_cfg.faith.label().to_uppercase()
+                ));
+            }
+
+            if let Some(ref hint) = sched.feast_hint {
+                fb.set_text(hint);
+                fb.set_visible(true);
+            } else {
+                fb.set_visible(false);
+            }
+
             for (i, entry) in sched.entries.iter().enumerate() {
                 let slot = GtkBox::new(Orientation::Vertical, 3);
                 slot.add_css_class("umi-prayer-slot");
@@ -1498,14 +1563,49 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
             }
         })
     };
-    render_schedule();
-    page.append(&sched_strip);
 
-    let cfg_init = ctx.cfg.borrow().clone();
+    for &faith in FaithTradition::ALL {
+        let btn = Button::with_label(faith.pill_label());
+        btn.add_css_class("umi-faith-pill");
+        if cfg_init.prayer.faith == faith {
+            btn.add_css_class("active");
+        }
+        let c = ctx.clone();
+        let fbs = Rc::clone(&faith_btns);
+        let rs = Rc::clone(&render_schedule);
+        let sc = Rc::clone(&sync_custom_entry_text);
+        btn.connect_clicked(move |_| {
+            {
+                let mut cfg = c.cfg.borrow_mut();
+                if cfg.prayer.faith != faith {
+                    cfg.prayer.faith = faith;
+                    cfg.prayer.custom_slots.clear();
+                }
+            }
+            for (fid, b) in fbs.borrow().iter() {
+                if *fid == faith {
+                    b.add_css_class("active");
+                } else {
+                    b.remove_css_class("active");
+                }
+            }
+            c.commit();
+            sc();
+            rs();
+        });
+        faith_strip.append(&btn);
+        faith_btns.borrow_mut().push((faith, btn));
+    }
+
+    page.append(&faith_strip);
+    page.append(&sched_hdr);
+    page.append(&sched_strip);
+    page.append(&feast_banner);
+
     let card = GtkBox::new(Orientation::Vertical, 10);
     card.add_css_class("umi-card");
 
-    // Location Source segmented
+    // --- Islam-specific options (Location Source, City, Calculation Method) ---
     {
         let row = GtkBox::new(Orientation::Horizontal, 6);
         let lbl = Label::new(Some("Location Source"));
@@ -1547,17 +1647,15 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
         }
         row.append(&b_auto);
         row.append(&b_pick);
-        card.append(&row);
-    }
-    card.append(&make_sep());
+        islam_box.append(&row);
+        islam_box.append(&make_sep());
 
-    // City dropdown
-    {
-        let row = GtkBox::new(Orientation::Horizontal, 8);
-        let lbl = Label::new(Some("Detected / Fallback City"));
-        lbl.add_css_class("umi-row-title");
-        lbl.set_hexpand(true);
-        lbl.set_xalign(0.0);
+        // City dropdown
+        let row_c = GtkBox::new(Orientation::Horizontal, 8);
+        let lbl_c = Label::new(Some("Detected / Fallback City"));
+        lbl_c.add_css_class("umi-row-title");
+        lbl_c.set_hexpand(true);
+        lbl_c.set_xalign(0.0);
         let names: Vec<&str> = CITIES.iter().map(|(c, _, _)| *c).collect();
         let model = StringList::new(&names);
         let dd = DropDown::new(Some(model), None::<gtk4::Expression>);
@@ -1582,31 +1680,29 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
                 }
             });
         }
-        row.append(&lbl);
-        row.append(&dd);
-        card.append(&row);
-    }
-    card.append(&make_sep());
+        row_c.append(&lbl_c);
+        row_c.append(&dd);
+        islam_box.append(&row_c);
+        islam_box.append(&make_sep());
 
-    // Calculation Method dropdown
-    {
-        let row = GtkBox::new(Orientation::Horizontal, 8);
-        let lbl = Label::new(Some("Calculation Method"));
-        lbl.add_css_class("umi-row-title");
-        lbl.set_hexpand(true);
-        lbl.set_xalign(0.0);
+        // Calculation Method dropdown
+        let row_m = GtkBox::new(Orientation::Horizontal, 8);
+        let lbl_m = Label::new(Some("Calculation Method"));
+        lbl_m.add_css_class("umi-row-title");
+        lbl_m.set_hexpand(true);
+        lbl_m.set_xalign(0.0);
         let labels: Vec<&str> = METHODS.iter().map(|(_, l)| *l).collect();
-        let model = StringList::new(&labels);
-        let dd = DropDown::new(Some(model), None::<gtk4::Expression>);
-        let init_idx = METHODS
+        let model_m = StringList::new(&labels);
+        let dd_m = DropDown::new(Some(model_m), None::<gtk4::Expression>);
+        let init_m = METHODS
             .iter()
             .position(|(id, _)| *id == cfg_init.prayer.method)
             .unwrap_or(0) as u32;
-        dd.set_selected(init_idx);
+        dd_m.set_selected(init_m);
         {
             let c = ctx.clone();
             let rs = Rc::clone(&render_schedule);
-            dd.connect_selected_notify(move |d| {
+            dd_m.connect_selected_notify(move |d| {
                 if let Some((id, _)) = METHODS.get(d.selected() as usize) {
                     c.cfg.borrow_mut().prayer.method = (*id).to_string();
                     c.commit();
@@ -1614,16 +1710,77 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
                 }
             });
         }
-        row.append(&lbl);
-        row.append(&dd);
-        card.append(&row);
+        row_m.append(&lbl_m);
+        row_m.append(&dd_m);
+        islam_box.append(&row_m);
     }
+
+    // --- Non-Islam custom slots + lunar/weekly feast reminder ---
+    {
+        let row = GtkBox::new(Orientation::Horizontal, 8);
+        let lbl = Label::new(Some("Custom Daily Times (HH:MM)"));
+        lbl.add_css_class("umi-row-title");
+        lbl.set_xalign(0.0);
+        let save_btn = Button::with_label("Apply");
+        save_btn.add_css_class("umi-action-btn");
+        {
+            let c = ctx.clone();
+            let ce = custom_entry.clone();
+            let rs = Rc::clone(&render_schedule);
+            save_btn.connect_clicked(move |_| {
+                let parts: Vec<String> = ce
+                    .text()
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                c.cfg.borrow_mut().prayer.custom_slots = parts;
+                c.commit();
+                rs();
+            });
+        }
+        let reset_btn = Button::with_label("Default");
+        reset_btn.add_css_class("umi-seg-btn");
+        {
+            let c = ctx.clone();
+            let rs = Rc::clone(&render_schedule);
+            let sc = Rc::clone(&sync_custom_entry_text);
+            reset_btn.connect_clicked(move |_| {
+                c.cfg.borrow_mut().prayer.custom_slots.clear();
+                c.commit();
+                sc();
+                rs();
+            });
+        }
+        row.append(&lbl);
+        row.append(&custom_entry);
+        row.append(&save_btn);
+        row.append(&reset_btn);
+        other_box.append(&row);
+        other_box.append(&make_sep());
+
+        let c_fr = ctx.clone();
+        let rs_fr = Rc::clone(&render_schedule);
+        other_box.append(&make_toggle_row(
+            "Holy Day / Lunar & Sunday Reminder",
+            "Auto-detect Purnama / Tilem / Uposatha / Che It & Cap Go / Sunday worship",
+            cfg_init.prayer.show_feast_reminder,
+            move |v| {
+                c_fr.cfg.borrow_mut().prayer.show_feast_reminder = v;
+                c_fr.commit();
+                rs_fr();
+            },
+        ));
+    }
+
+    card.append(&islam_box);
+    card.append(&other_box);
     card.append(&make_sep());
 
-    // Pre-Prayer Nudge
+    // Pre-Prayer / Devotion Nudge
     {
         let row = GtkBox::new(Orientation::Horizontal, 6);
-        let lbl = Label::new(Some("Pre-Prayer Nudge"));
+        let lbl = Label::new(Some("Pre-Prayer / Devotion Nudge"));
         lbl.add_css_class("umi-row-title");
         lbl.set_hexpand(true);
         lbl.set_xalign(0.0);
@@ -1657,8 +1814,8 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
 
     let c_ap = ctx.clone();
     card.append(&make_toggle_row(
-        "Auto-Pause Music on Adzan",
-        "Automatically pause active media when prayer time arrives",
+        "Auto-Pause Media on Prayer / Devotion Time",
+        "Automatically pause Spotify / YouTube when schedule arrives",
         cfg_init.prayer.auto_pause_music,
         move |v| {
             c_ap.cfg.borrow_mut().prayer.auto_pause_music = v;
@@ -1669,7 +1826,7 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
 
     let c_sa = ctx.clone();
     card.append(&make_toggle_row(
-        "Show Sun Arc Countdown in Notch",
+        "Show Sun Arc / Slot Progress in Notch",
         "Calculated 100% offline on your device without tracking",
         cfg_init.prayer.show_sun_arc,
         move |v| {
@@ -1678,7 +1835,316 @@ fn build_screen_prayer(ctx: &SettingsCtx) -> GtkBox {
         },
     ));
 
+    sync_custom_entry_text();
+    render_schedule();
+
     page.append(&card);
+    page
+}
+
+/// Screen 8 · Widgets & Calendar (FigCraft Settings 08 — 2-Slot Picker, 8 Widgets, Calendar To-Do)
+fn build_screen_widgets_calendar(ctx: &SettingsCtx) -> GtkBox {
+    let page = GtkBox::new(Orientation::Vertical, 12);
+
+    // Header row + Swap L/R button
+    let hdr_row = GtkBox::new(Orientation::Horizontal, 8);
+    let hdr_left = page_header(
+        "Widgets & Calendar",
+        "Choose 2 mini-widgets for State 14 · Widgets + Calendar To-Do preferences.",
+    );
+    hdr_left.set_hexpand(true);
+    let swap_btn = Button::with_label("⇄ Swap L/R");
+    swap_btn.add_css_class("umi-action-btn");
+    swap_btn.set_valign(Align::Center);
+    hdr_row.append(&hdr_left);
+    hdr_row.append(&swap_btn);
+    page.append(&hdr_row);
+
+    // Card 1: Active Notch Slots Preview (Left + Right)
+    let preview_card = GtkBox::new(Orientation::Vertical, 8);
+    preview_card.add_css_class("umi-card");
+    preview_card.append(&section_label("ACTIVE NOTCH SLOTS · STATE 14 (2 SLOTS)"));
+
+    let slots_row = GtkBox::new(Orientation::Horizontal, 10);
+    slots_row.set_homogeneous(true);
+
+    let left_box = GtkBox::new(Orientation::Vertical, 2);
+    left_box.add_css_class("umi-slot-preview-left");
+    let left_tag = Label::new(Some("LEFT SLOT"));
+    left_tag.add_css_class("umi-slot-tag-left");
+    left_tag.set_xalign(0.0);
+    let left_name = Label::new(None);
+    left_name.add_css_class("umi-row-title");
+    left_name.set_xalign(0.0);
+    left_box.append(&left_tag);
+    left_box.append(&left_name);
+
+    let right_box = GtkBox::new(Orientation::Vertical, 2);
+    right_box.add_css_class("umi-slot-preview-right");
+    let right_tag = Label::new(Some("RIGHT SLOT"));
+    right_tag.add_css_class("umi-slot-tag-right");
+    right_tag.set_xalign(0.0);
+    let right_name = Label::new(None);
+    right_name.add_css_class("umi-row-title");
+    right_name.set_xalign(0.0);
+    right_box.append(&right_tag);
+    right_box.append(&right_name);
+
+    slots_row.append(&left_box);
+    slots_row.append(&right_box);
+    preview_card.append(&slots_row);
+    page.append(&preview_card);
+
+    // Card 2: Widget Gallery (8 selectable widgets in 2x4 grid)
+    let gallery_card = GtkBox::new(Orientation::Vertical, 8);
+    gallery_card.add_css_class("umi-card");
+    gallery_card.append(&section_label(
+        "WIDGET GALLERY (8 PILIHAN) — UNUSED WIDGETS SLEEP AT 0% CPU",
+    ));
+
+    let widget_controls: Rc<RefCell<Vec<(WidgetKind, GtkBox, Button, Button)>>> =
+        Rc::new(RefCell::new(Vec::new()));
+
+    let sync_widgets_ui = {
+        let cfg_rc = Rc::clone(&ctx.cfg);
+        let ln = left_name.clone();
+        let rn = right_name.clone();
+        let ctrls = Rc::clone(&widget_controls);
+        Rc::new(move || {
+            let (wl, wr) = {
+                let c = cfg_rc.borrow();
+                (c.widgets.left, c.widgets.right)
+            };
+            ln.set_text(&format!("{}  {}", wl.glyph(), wl.title()));
+            rn.set_text(&format!("{}  {}", wr.glyph(), wr.title()));
+            for (kind, card, bl, br) in ctrls.borrow().iter() {
+                card.remove_css_class("slot-left");
+                card.remove_css_class("slot-right");
+                bl.remove_css_class("active-left");
+                br.remove_css_class("active-right");
+                if *kind == wl {
+                    card.add_css_class("slot-left");
+                    bl.add_css_class("active-left");
+                    bl.set_label("✓ L");
+                } else {
+                    bl.set_label("Kiri");
+                }
+                if *kind == wr {
+                    card.add_css_class("slot-right");
+                    br.add_css_class("active-right");
+                    br.set_label("✓ R");
+                } else {
+                    br.set_label("Kanan");
+                }
+            }
+        })
+    };
+
+    for chunk in WidgetKind::ALL.chunks(2) {
+        let row = GtkBox::new(Orientation::Horizontal, 8);
+        row.set_homogeneous(true);
+        for &kind in chunk {
+            let wcard = GtkBox::new(Orientation::Horizontal, 6);
+            wcard.add_css_class("umi-widget-card");
+            wcard.set_valign(Align::Center);
+
+            let info = GtkBox::new(Orientation::Vertical, 1);
+            info.set_hexpand(true);
+            let t = Label::new(Some(&format!("{}  {}", kind.glyph(), kind.title())));
+            t.add_css_class("umi-row-title");
+            t.set_xalign(0.0);
+            let s = Label::new(Some(kind.subtitle()));
+            s.add_css_class("umi-row-sub");
+            s.set_xalign(0.0);
+            info.append(&t);
+            info.append(&s);
+
+            let bl = Button::with_label("Kiri");
+            bl.add_css_class("umi-slot-btn");
+            bl.set_valign(Align::Center);
+            let br = Button::with_label("Kanan");
+            br.add_css_class("umi-slot-btn");
+            br.set_valign(Align::Center);
+
+            {
+                let c = ctx.clone();
+                let sync = Rc::clone(&sync_widgets_ui);
+                bl.connect_clicked(move |_| {
+                    c.cfg.borrow_mut().widgets.left = kind;
+                    c.commit();
+                    sync();
+                });
+            }
+            {
+                let c = ctx.clone();
+                let sync = Rc::clone(&sync_widgets_ui);
+                br.connect_clicked(move |_| {
+                    c.cfg.borrow_mut().widgets.right = kind;
+                    c.commit();
+                    sync();
+                });
+            }
+
+            wcard.append(&info);
+            wcard.append(&bl);
+            wcard.append(&br);
+            row.append(&wcard);
+            widget_controls.borrow_mut().push((kind, wcard, bl, br));
+        }
+        gallery_card.append(&row);
+    }
+
+    {
+        let c = ctx.clone();
+        let sync = Rc::clone(&sync_widgets_ui);
+        swap_btn.connect_clicked(move |_| {
+            {
+                let mut cfg = c.cfg.borrow_mut();
+                let w = &mut cfg.widgets;
+                std::mem::swap(&mut w.left, &mut w.right);
+            }
+            c.commit();
+            sync();
+        });
+    }
+
+    sync_widgets_ui();
+    page.append(&gallery_card);
+
+    // Card 3: Calendar To-Do, Sensor Refresh & Quick Notes
+    let cfg_init = ctx.cfg.borrow().clone();
+    let cal_card = GtkBox::new(Orientation::Vertical, 10);
+    cal_card.add_css_class("umi-card");
+    cal_card.append(&section_label("CALENDAR TO-DO, QUICK NOTES & SENSOR REFRESH"));
+
+    // Week starts on Monday / Sunday
+    {
+        let row = GtkBox::new(Orientation::Horizontal, 6);
+        let lbl = Label::new(Some("Calendar Week Starts On"));
+        lbl.add_css_class("umi-row-title");
+        lbl.set_hexpand(true);
+        lbl.set_xalign(0.0);
+        row.append(&lbl);
+
+        let b_mon = Button::with_label("Monday");
+        b_mon.add_css_class("umi-seg-btn");
+        let b_sun = Button::with_label("Sunday");
+        b_sun.add_css_class("umi-seg-btn");
+        if cfg_init.widgets.week_starts_monday {
+            b_mon.add_css_class("active");
+        } else {
+            b_sun.add_css_class("active");
+        }
+        {
+            let c = ctx.clone();
+            let bm = b_mon.clone();
+            let bs = b_sun.clone();
+            b_mon.connect_clicked(move |_| {
+                c.cfg.borrow_mut().widgets.week_starts_monday = true;
+                bm.add_css_class("active");
+                bs.remove_css_class("active");
+                c.commit();
+            });
+        }
+        {
+            let c = ctx.clone();
+            let bm = b_mon.clone();
+            let bs = b_sun.clone();
+            b_sun.connect_clicked(move |_| {
+                c.cfg.borrow_mut().widgets.week_starts_monday = false;
+                bs.add_css_class("active");
+                bm.remove_css_class("active");
+                c.commit();
+            });
+        }
+        row.append(&b_mon);
+        row.append(&b_sun);
+        cal_card.append(&row);
+    }
+    cal_card.append(&make_sep());
+
+    let c_cal = ctx.clone();
+    cal_card.append(&make_toggle_row(
+        "Show Date Picker & Task Dots in To-Do (State 13)",
+        "Klik tanggal mana saja di kalender untuk lihat & tulis What to Do hari itu",
+        cfg_init.widgets.show_todo_calendar,
+        move |v| {
+            c_cal.cfg.borrow_mut().widgets.show_todo_calendar = v;
+            c_cal.commit();
+        },
+    ));
+    cal_card.append(&make_sep());
+
+    // Sensor Refresh Interval (1s / 2s Hemat / 5s)
+    {
+        let row = GtkBox::new(Orientation::Horizontal, 6);
+        let lbl = Label::new(Some("Sensor Refresh Interval (CPU / RAM / Network)"));
+        lbl.add_css_class("umi-row-title");
+        lbl.set_hexpand(true);
+        lbl.set_xalign(0.0);
+        row.append(&lbl);
+
+        let r_btns: Rc<RefCell<Vec<(u32, Button)>>> = Rc::new(RefCell::new(Vec::new()));
+        for (secs, text) in [(1u32, "1s"), (2, "2s Hemat"), (5, "5s")] {
+            let b = Button::with_label(text);
+            b.add_css_class("umi-seg-btn");
+            if cfg_init.widgets.refresh_secs == secs {
+                b.add_css_class("active");
+            }
+            let c = ctx.clone();
+            let rbs = Rc::clone(&r_btns);
+            b.connect_clicked(move |_| {
+                c.cfg.borrow_mut().widgets.refresh_secs = secs;
+                for (sid, btn) in rbs.borrow().iter() {
+                    if *sid == secs {
+                        btn.add_css_class("active");
+                    } else {
+                        btn.remove_css_class("active");
+                    }
+                }
+                c.commit();
+            });
+            row.append(&b);
+            r_btns.borrow_mut().push((secs, b));
+        }
+        cal_card.append(&row);
+    }
+    cal_card.append(&make_sep());
+
+    // Quick Notes editor (persisted to SQLite)
+    {
+        let row = GtkBox::new(Orientation::Horizontal, 8);
+        let lbl = Label::new(Some("Quick Notes Text"));
+        lbl.add_css_class("umi-row-title");
+        lbl.set_xalign(0.0);
+        let note_entry = Entry::new();
+        note_entry.add_css_class("umi-settings-entry");
+        note_entry.set_hexpand(true);
+        note_entry.set_placeholder_text(Some("Tulis catatan singkat untuk widget Quick Notes..."));
+        if let Some(ref db) = ctx.db {
+            if let Ok(cur) = db.get_quick_note() {
+                note_entry.set_text(&cur);
+            }
+        }
+        let save_note_btn = Button::with_label("Save");
+        save_note_btn.add_css_class("umi-action-btn");
+        {
+            let c = ctx.clone();
+            let ne = note_entry.clone();
+            save_note_btn.connect_clicked(move |_| {
+                if let Some(ref db) = c.db {
+                    let _ = db.set_quick_note(&ne.text());
+                }
+                c.commit();
+            });
+        }
+        row.append(&lbl);
+        row.append(&note_entry);
+        row.append(&save_note_btn);
+        cal_card.append(&row);
+    }
+
+    page.append(&cal_card);
     page
 }
 

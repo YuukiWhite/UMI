@@ -5,6 +5,7 @@ pub mod location;
 pub mod mpris;
 pub mod notifications;
 pub mod portals;
+pub mod telemetry;
 pub mod upower;
 
 use crate::ai::{self, AiRequest};
