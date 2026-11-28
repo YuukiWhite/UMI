@@ -18,11 +18,56 @@ use gtk4::gio;
 use gtk4::prelude::*;
 use gtk4::Application;
 use state::{AppEvent, MediaCommand};
+use std::io::{self, Write};
+use std::os::fd::AsRawFd;
+use std::os::unix::fs::FileTypeExt;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 use tracing_subscriber::EnvFilter;
 use ui::notch::window::build_notch_window;
 use ui::tray::{spawn_tray, TrayFlags};
+
+/// Tracing writer that swallows `BrokenPipe` (`EPIPE`) so background desktop launches
+/// (e.g. Gear Lever / Flatpak closing its launcher pipe) never panic or abort the daemon.
+struct SafeStderrWriter;
+
+impl Write for SafeStderrWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match io::stderr().write(buf) {
+            Ok(n) => Ok(n),
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(buf.len()),
+            Err(_) => Ok(buf.len()),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let _ = io::stderr().flush();
+        Ok(())
+    }
+}
+
+/// When launched as a GUI daemon by launchers like Gear Lever (Flatpak), stdout/stderr are
+/// often attached to a temporary pipe (`FIFO`) that closes once the launcher window exits.
+/// Any subsequent `eprintln!` inside a dependency would then panic with `Broken pipe (os error 32)`.
+/// Redirect pipe-backed stdout/stderr to `/dev/null`, while leaving terminals and systemd journal intact.
+fn detach_pipe_stdio_for_daemon() {
+    extern "C" {
+        fn dup2(oldfd: i32, newfd: i32) -> i32;
+    }
+    let Ok(devnull) = std::fs::OpenOptions::new().write(true).open("/dev/null") else {
+        return;
+    };
+    for fd in [1i32, 2i32] {
+        let path = format!("/proc/self/fd/{fd}");
+        if let Ok(meta) = std::fs::metadata(&path) {
+            if meta.file_type().is_fifo() {
+                unsafe {
+                    dup2(devnull.as_raw_fd(), fd);
+                }
+            }
+        }
+    }
+}
 
 fn main() -> Result<()> {
     // Use lightweight 2D Cairo Wayland SHM renderer by default (avoids ~65MB Mesa Vulkan/GL RSS overhead)
@@ -34,13 +79,18 @@ fn main() -> Result<()> {
         std::env::set_var("MALLOC_ARENA_MAX", "2");
     }
 
+    let args = Cli::parse();
+
+    if args.command.is_none() {
+        detach_pipe_stdio_for_daemon();
+    }
+
     tracing_subscriber::fmt()
+        .with_writer(|| SafeStderrWriter)
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("umi=info")),
         )
         .init();
-
-    let args = Cli::parse();
 
     // 1 Tokio worker thread + 2 blocking slots is plenty for D-Bus/HTTP watchers and avoids 16+ idle thread stacks
     let rt = tokio::runtime::Builder::new_multi_thread()

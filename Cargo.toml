@@ -1,6 +1,6 @@
 [package]
 name = "umi"
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 description = "UMI — Ambient Dynamic Island companion for Fedora KDE Plasma (Wayland)"
 license = "MIT"
